@@ -44,16 +44,21 @@ jobs:
       - name: مفتاح التوقيع
         if: steps.check.outputs.ok == 'true'
         run: |
+          # أداة التوقيع تقبل الحروف الإنجليزية فقط، فنحوّل كلمة السر (بأي لغة) إلى رمز ثابت منها
+          STORE_PASS=$(printf '%s' "$KEY_PASS" | sha256sum | cut -c1-40)
+          echo "::add-mask::$STORE_PASS"
+          echo "STORE_PASS=$STORE_PASS" >> "$GITHUB_ENV"
+          export STORE_PASS
           if [ -f signing/release.keystore.enc ]; then
             openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
-              -in signing/release.keystore.enc -out android/app/release.keystore -pass env:KEY_PASS
+              -in signing/release.keystore.enc -out android/app/release.keystore -pass env:STORE_PASS
           else
             keytool -genkeypair -keystore android/app/release.keystore -alias iqama \
               -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass:env KEY_PASS -keypass:env KEY_PASS -dname "CN=Masjid Iqama, C=MR"
+              -storepass:env STORE_PASS -keypass:env STORE_PASS -dname "CN=Masjid Iqama, C=MR"
             mkdir -p signing
             openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
-              -in android/app/release.keystore -out signing/release.keystore.enc -pass env:KEY_PASS
+              -in android/app/release.keystore -out signing/release.keystore.enc -pass env:STORE_PASS
             echo "NEW_KEY=1" >> "$GITHUB_ENV"
           fi
 

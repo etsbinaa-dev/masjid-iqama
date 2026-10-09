@@ -21,9 +21,9 @@ android {
         release {
             // مفتاح التوقيع الثابت: يفكّ تشفيره GitHub عند البناء، وكلمة السر في أسرار المستودع
             storeFile file('release.keystore')
-            storePassword System.getenv('KEY_PASS')
+            storePassword System.getenv('STORE_PASS')
             keyAlias 'iqama'
-            keyPassword System.getenv('KEY_PASS')
+            keyPassword System.getenv('STORE_PASS')
         }
     }
     buildTypes {
