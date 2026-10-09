@@ -1,0 +1,10 @@
+{
+  "appId": "org.masjid.iqama",
+  "appName": "أوقات الإقامة",
+  "webDir": "www",
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#d4a84b"
+    }
+  }
+}

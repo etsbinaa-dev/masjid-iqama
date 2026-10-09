@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>أوقات الإقامة</title>
+<style>
+  :root { --bg:#0f2a24; --card:#163a32; --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
+         padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  .wrap { max-width:520px; margin:0 auto; padding:16px; }
+  h1 { text-align:center; margin:8px 0 4px; font-size:1.6rem; }
+  .date { text-align:center; color:var(--muted); margin-bottom:12px; line-height:1.6; }
+  .clock { text-align:center; font-size:2.6rem; font-weight:bold; letter-spacing:2px; }
+  .next { background:var(--accent); color:var(--on-accent); border-radius:14px; padding:14px; text-align:center; margin:14px 0; }
+  .next b { font-size:1.3rem; }
+  .countdown { font-size:2rem; font-weight:bold; margin-top:4px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--card);
+         border-radius:12px; padding:14px 16px; margin:8px 0; font-size:1.25rem; }
+  .row.active { outline:3px solid var(--accent); }
+  .note { text-align:center; color:var(--muted); margin-top:14px; white-space:pre-line; }
+  .clock, .countdown, .row span:last-child { font-variant-numeric:tabular-nums; }
+  .settings { background:var(--card); border-radius:12px; padding:14px 16px; margin-top:18px; display:grid; gap:12px; }
+  .settings h2 { margin:0; font-size:1.1rem; }
+  .settings label { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:1.05rem; }
+  select { font-size:1.05rem; padding:6px; border-radius:8px; background:var(--text); color:var(--bg); border:none; }
+  input[type=checkbox] { width:24px; height:24px; accent-color:var(--accent); }
+  button { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 12px; font-size:1rem; }
+  .status { color:var(--muted); font-size:.95rem; line-height:1.6; }
+  .updated { text-align:center; color:var(--muted); font-size:.85rem; margin-top:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="name"></h1>
+  <div class="date" id="date"></div>
+  <div class="clock" id="clock"></div>
+  <div class="next" id="next"></div>
+  <div id="list"></div>
+  <div class="note" id="note"></div>
+
+  <div class="settings">
+    <h2>التنبيه قبل الإقامة</h2>
+    <label for="notifyOn">تفعيل التنبيه
+      <input type="checkbox" id="notifyOn">
+    </label>
+    <label for="minutes">قبل الإقامة بـ
+      <select id="minutes">
+        <option value="5">5 دقائق</option>
+        <option value="10">10 دقائق</option>
+        <option value="15">15 دقيقة</option>
+        <option value="20">20 دقيقة</option>
+        <option value="30">30 دقيقة</option>
+      </select>
+    </label>
+    <div class="status" id="notifyStatus"></div>
+    <button id="exactBtn" hidden>اسمح بالتنبيه في الوقت الدقيق</button>
+  </div>
+  <div class="updated" id="updated"></div>
+</div>
+
+<script src="capacitor.js"></script>
+<script>
+// ملف الأوقات على الإنترنت: عدّله ليتغيّر الوقت عند كل من ثبّت التطبيق
+const TIMES_URL = "https://raw.githubusercontent.com/etsbinaa-dev/masjid-iqama/main/times.json";
+
+// أوقات احتياطية تُستعمل إن لم يتوفر الإنترنت عند أول فتح
+const DEFAULTS = {
+  mosqueName: "مسجد الحي",
+  note: "يرجى إغلاق الهاتف داخل المسجد",
+  prayers: [
+    { name: "الفجر",  iqama: "06:30" },
+    { name: "الظهر",  iqama: "14:15" },
+    { name: "العصر",  iqama: "17:15" },
+    { name: "المغرب", iqama: "19:40" },
+    { name: "العشاء", iqama: "21:00" }
+  ],
+  jumuah: "14:00"
+};
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+let cfg = store.get("times", DEFAULTS);
+let settings = store.get("settings", { on: true, minutes: 10 });
+let updatedAt = store.get("updatedAt", null);
+
+const Notif = window.Capacitor && window.Capacitor.isNativePlatform()
+  ? window.Capacitor.registerPlugin("LocalNotifications") : null;
+
+// ---------- العرض ----------
+function todayPrayers(now) {
+  const list = cfg.prayers.map(p => ({ ...p }));
+  if (now.getDay() === 5) list[1] = { name: "الجمعة", iqama: cfg.jumuah };
+  return list;
+}
+function toDate(hhmm, base) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const d = new Date(base); d.setHours(h, m, 0, 0); return d;
+}
+function fmt12(hhmm) {
+  let [h, m] = hhmm.split(":").map(Number);
+  const s = h < 12 ? "ص" : "م"; h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2, "0")} ${s}`;
+}
+function findNext(now) {
+  const list = todayPrayers(now);
+  for (let i = 0; i < list.length; i++) {
+    const t = toDate(list[i].iqama, now);
+    if (t > now) return { index: i, prayer: list[i], time: t };
+  }
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+  const first = todayPrayers(tomorrow)[0];
+  return { index: -1, prayer: first, time: toDate(first.iqama, tomorrow) };
+}
+function render() {
+  const now = new Date();
+  $("name").textContent = cfg.mosqueName;
+  $("note").textContent = cfg.note || "";
+  $("clock").textContent = now.toLocaleTimeString("ar-u-nu-latn", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const greg = now.toLocaleDateString("ar-u-nu-latn", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  let hijri = "";
+  try { hijri = now.toLocaleDateString("ar-u-ca-islamic-umalqura-nu-latn", { day: "numeric", month: "long", year: "numeric" }); } catch {}
+  $("date").innerHTML = `${greg}<br>${hijri}`;
+
+  const nx = findNext(now);
+  const diff = Math.max(0, Math.floor((nx.time - now) / 1000));
+  const h = Math.floor(diff / 3600), m = Math.floor(diff % 3600 / 60), s = diff % 60;
+  $("next").innerHTML = `الإقامة القادمة: <b>${nx.prayer.name}</b> (${fmt12(nx.prayer.iqama)})
+     <div class="countdown">${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}</div>`;
+  $("list").innerHTML = todayPrayers(now).map((p, i) =>
+    `<div class="row ${i === nx.index ? "active" : ""}"><span>${p.name}</span><span>${fmt12(p.iqama)}</span></div>`).join("");
+}
+
+// ---------- جلب الأوقات من الإنترنت ----------
+function validTimes(t) {
+  const ok = v => typeof v === "string" && /^\d{1,2}:\d{2}$/.test(v);
+  return t && Array.isArray(t.prayers) && t.prayers.length === 5 && t.prayers.every(p => p.name && ok(p.iqama)) && ok(t.jumuah);
+}
+async function refreshTimes() {
+  try {
+    const res = await fetch(TIMES_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const t = await res.json();
+    if (!validTimes(t)) return;
+    const changed = JSON.stringify(t) !== JSON.stringify(cfg);
+    cfg = t; store.set("times", cfg);
+    updatedAt = new Date().toISOString(); store.set("updatedAt", updatedAt);
+    showUpdated(); render();
+    if (changed) scheduleAll();
+  } catch {}
+}
+function showUpdated() {
+  $("updated").textContent = updatedAt
+    ? "آخر تحديث للأوقات: " + new Date(updatedAt).toLocaleString("ar-u-nu-latn", { dateStyle: "medium", timeStyle: "short" })
+    : "";
+}
+
+// ---------- التنبيهات ----------
+// وقت التنبيه = وقت الإقامة ناقص عدد الدقائق المختار
+function minus(hhmm, mins) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const t = ((h * 60 + m - mins) % 1440 + 1440) % 1440;
+  return { hour: Math.floor(t / 60), minute: t % 60 };
+}
+function buildNotifications() {
+  const n = settings.minutes;
+  const items = [];
+  const add = (id, name, iqama, weekday) => {
+    const at = minus(iqama, n);
+    items.push({
+      id, channelId: "iqama",
+      title: `إقامة ${name} بعد ${n} دقائق`,
+      body: `${cfg.mosqueName} — الإقامة ${fmt12(iqama)}`,
+      schedule: { on: weekday ? { weekday, ...at } : at, allowWhileIdle: true }
+    });
+  };
+  const [fajr, dhuhr, asr, maghrib, isha] = cfg.prayers;
+  add(1, fajr.name, fajr.iqama);
+  add(3, asr.name, asr.iqama);
+  add(4, maghrib.name, maghrib.iqama);
+  add(5, isha.name, isha.iqama);
+  // الظهر كل الأيام عدا الجمعة (1=الأحد ... 6=الجمعة، 7=السبت)
+  [1, 2, 3, 4, 5, 7].forEach(d => add(20 + d, dhuhr.name, dhuhr.iqama, d));
+  add(26, "الجمعة", cfg.jumuah, 6);
+  return items;
+}
+async function cancelAll() {
+  const pending = await Notif.getPending();
+  if (pending.notifications.length) {
+    await Notif.cancel({ notifications: pending.notifications.map(x => ({ id: x.id })) });
+  }
+}
+async function scheduleAll() {
+  if (!Notif) { $("notifyStatus").textContent = "التنبيهات تعمل داخل تطبيق الجوال فقط."; return; }
+  try {
+    await cancelAll();
+    if (!settings.on) { $("notifyStatus").textContent = "التنبيه متوقف."; return; }
+    let perm = await Notif.checkPermissions();
+    if (perm.display !== "granted") perm = await Notif.requestPermissions();
+    if (perm.display !== "granted") {
+      $("notifyStatus").textContent = "لم تسمح للتطبيق بالإشعارات. فعّلها من إعدادات الجوال ← التطبيقات ← أوقات الإقامة ← الإشعارات.";
+      return;
+    }
+    await Notif.createChannel({ id: "iqama", name: "تنبيه الإقامة", importance: 5, visibility: 1, vibration: true });
+    await Notif.schedule({ notifications: buildNotifications() });
+    $("notifyStatus").textContent = `سيصلك تنبيه قبل كل إقامة بـ ${settings.minutes} دقائق.`;
+    try {
+      const exact = await Notif.checkExactNotificationSetting();
+      $("exactBtn").hidden = exact.exact_notification === "granted";
+    } catch {}
+  } catch (e) {
+    $("notifyStatus").textContent = "تعذّر ضبط التنبيهات. أغلق التطبيق وافتحه مرة أخرى.";
+  }
+}
+
+$("notifyOn").checked = settings.on;
+$("minutes").value = String(settings.minutes);
+$("notifyOn").onchange = e => { settings.on = e.target.checked; store.set("settings", settings); scheduleAll(); };
+$("minutes").onchange = e => { settings.minutes = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
+$("exactBtn").onclick = async () => {
+  try { await Notif.changeExactNotificationSetting(); } catch {}
+  scheduleAll();
+};
+
+showUpdated();
+render();
+setInterval(render, 1000);
+scheduleAll();
+refreshTimes();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshTimes(); });
+</script>
+</body>
+</html>

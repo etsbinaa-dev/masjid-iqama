@@ -1,0 +1,93 @@
+name: بناء التطبيق APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["times.json", "README.md", "signing/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KEY_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+    steps:
+      - name: التحقق من كلمة سر التوقيع
+        id: check
+        run: |
+          if [ -z "$KEY_PASS" ]; then
+            echo "::warning::أضف السر KEYSTORE_PASSWORD في إعدادات المستودع ثم أعد التشغيل"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ok == 'true'
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        if: steps.check.outputs.ok == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # مفتاح واحد ثابت: يُنشأ مرة واحدة فقط ويُحفظ مشفّراً في المستودع،
+      # ثم يُفكّ تشفيره في كل بناء حتى تُثبَّت التحديثات فوق النسخة القديمة.
+      - name: مفتاح التوقيع
+        if: steps.check.outputs.ok == 'true'
+        run: |
+          if [ -f signing/release.keystore.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+              -in signing/release.keystore.enc -out android/app/release.keystore -pass env:KEY_PASS
+          else
+            keytool -genkeypair -keystore android/app/release.keystore -alias iqama \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass:env KEY_PASS -keypass:env KEY_PASS -dname "CN=Masjid Iqama, C=MR"
+            mkdir -p signing
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+              -in android/app/release.keystore -out signing/release.keystore.enc -pass env:KEY_PASS
+            echo "NEW_KEY=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: تثبيت الحزم
+        if: steps.check.outputs.ok == 'true'
+        run: npm ci
+
+      - name: نسخ صفحة التطبيق إلى أندرويد
+        if: steps.check.outputs.ok == 'true'
+        run: npx cap sync android
+
+      - name: بناء APK
+        if: steps.check.outputs.ok == 'true'
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease -PversionCode=${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk ../masjid-iqama.apk
+
+      - name: حفظ المفتاح المشفّر (أول مرة فقط)
+        if: steps.check.outputs.ok == 'true' && env.NEW_KEY == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add signing/release.keystore.enc
+          git commit -m "حفظ مفتاح التوقيع المشفّر"
+          git push
+
+      - name: نشر النسخة في صفحة Releases
+        if: steps.check.outputs.ok == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: النسخة ${{ github.run_number }}
+          body: حمّل ملف masjid-iqama.apk وثبّته على جوال أندرويد.
+          files: masjid-iqama.apk
+          make_latest: true
