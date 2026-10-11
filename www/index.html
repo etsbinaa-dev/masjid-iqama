@@ -193,13 +193,12 @@ function buildNotifications() {
   add(26, "الجمعة", cfg.jumuah, 6);
   return items;
 }
-// قناة بصوت "حي على الصلاة". إعدادات القناة لا تتغيّر بعد إنشائها، لذلك قناة جديدة باسم جديد، ونحذف القديمة الصامتة
-const CHANNEL = "iqama_hayya";
+// قناة التنبيه تُنشأ في كود أندرويد (MainActivity) بصوت "المنبّه" حتى تُسمع في الوضع الصامت.
+// هنا نحذف القنوات القديمة فقط، لأن إعدادات القناة لا تتغيّر بعد إنشائها.
+const CHANNEL = "iqama_alarm";
 const SOUND = "hayya_salah.ogg";
 async function ensureChannel() {
-  for (const old of ["iqama", "iqama_sound"]) { try { await Notif.deleteChannel({ id: old }); } catch {} }
-  await Notif.createChannel({ id: CHANNEL, name: "تنبيه الإقامة", description: "تنبيه قبل إقامة الصلاة",
-    importance: 5, visibility: 1, vibration: true, sound: SOUND });
+  for (const old of ["iqama", "iqama_sound", "iqama_hayya"]) { try { await Notif.deleteChannel({ id: old }); } catch {} }
 }
 async function cancelAll() {
   const pending = await Notif.getPending();
@@ -250,7 +249,7 @@ $("testBtn").onclick = async () => {
       body: "هكذا سيصلك التنبيه قبل الإقامة",
       schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true }
     }] });
-    $("notifyStatus").textContent = "سيصلك تنبيه تجريبي بعد 5 ثوانٍ. إن لم تسمع صوتاً، راجع صوت الإشعارات في إعدادات الجوال.";
+    $("notifyStatus").textContent = "سيصلك تنبيه تجريبي بعد 5 ثوانٍ. التنبيه يستعمل صوت المنبّه، فإن لم تسمعه ارفع صوت المنبّه في الجوال.";
   } catch {
     $("notifyStatus").textContent = "تعذّرت التجربة. أغلق التطبيق وافتحه مرة أخرى.";
   }
