@@ -30,6 +30,9 @@
   button { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 12px; font-size:.95rem; }
   .status { color:var(--muted); font-size:.9rem; line-height:1.6; }
   .updated { text-align:center; color:var(--muted); font-size:.75rem; margin-top:8px; }
+  .adhkarRow { display:flex; gap:8px; margin-top:8px; }
+  .adhkarRow .adhkarBtn { flex:1; margin-top:0; padding:11px 6px; }
+  .dhikr .note { color:var(--muted); font-size:.9rem; }
   .adhkarBtn { display:block; width:100%; margin-top:8px; padding:11px 14px; font-size:1.05rem; background:var(--card); color:var(--accent); border:1px solid var(--accent); border-radius:10px; }
   #adhkarView { position:fixed; inset:0; background:var(--bg); overflow-y:auto; z-index:10;
                 padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
@@ -67,7 +70,11 @@
   <div id="list"></div>
   <div class="note" id="note"></div>
 
-  <button class="adhkarBtn" id="adhkarBtn">أذكار المساء</button>
+  <div class="adhkarRow">
+    <button class="adhkarBtn" data-sec="morning">أذكار الصباح</button>
+    <button class="adhkarBtn" data-sec="evening">أذكار المساء</button>
+    <button class="adhkarBtn" data-sec="sleep">أذكار النوم</button>
+  </div>
   <details class="settings" id="settingsBox">
     <summary id="settingsSummary">⚙ إعدادات التنبيه</summary>
     <div class="body">
@@ -95,12 +102,13 @@
 <div id="adhkarView" hidden>
   <div class="adhkarHead">
     <button id="adhkarBack">رجوع</button>
-    <div style="text-align:center"><h2>أذكار المساء</h2><small id="adhkarProgress"></small></div>
+    <div style="text-align:center"><h2 id="adhkarTitle">أذكار المساء</h2><small id="adhkarProgress"></small></div>
     <button id="adhkarReset">إعادة</button>
   </div>
   <div class="pager">
     <div class="dhikr" id="dhikrCard">
       <div class="title" id="dhikrTitle"></div>
+      <div class="note" id="dhikrNote"></div>
       <div class="txt" id="dhikrText"></div>
       <div class="src" id="dhikrSrc"></div>
       <div class="counter" id="dhikrCounter"><b id="dhikrLeft"></b><span id="dhikrLabel"></span></div>
@@ -315,26 +323,31 @@ $("exactBtn").onclick = async () => {
   scheduleAll();
 };
 
-// ---------- أذكار المساء ----------
-// اضغط على الذكر ليُنقص العدد حتى يكتمل. التقدّم يُحفظ لليوم نفسه ويبدأ من جديد في اليوم التالي.
+// ---------- الأذكار: الصباح والمساء والنوم ----------
+// اضغط على الذكر ليُنقص العدد حتى يكتمل. تقدّم كل قسم يُحفظ لليوم نفسه ويبدأ من جديد في اليوم التالي.
+const SECTION_TITLES = { morning: "أذكار الصباح", evening: "أذكار المساء", sleep: "أذكار النوم" };
+let allAdhkar = null;
+let section = "evening";
 let adhkar = [];
 const todayKey = () => new Date().toDateString();
 function loadDone() {
-  const saved = store.get("adhkarDone", null);
+  const saved = store.get("adhkarDone_" + section, null);
   return saved && saved.day === todayKey() ? saved.counts : {};
 }
-let done = loadDone();
-function saveDone() { store.set("adhkarDone", { day: todayKey(), counts: done }); }
+let done = {};
+function saveDone() { store.set("adhkarDone_" + section, { day: todayKey(), counts: done }); }
 let page = 0;
 function leftOf(i) { return adhkar[i].n - Math.min(done[i] || 0, adhkar[i].n); }
 function renderAdhkar() {
-  if (store.get("adhkarDone", {}).day !== todayKey()) done = {};
+  if ((store.get("adhkarDone_" + section, {}) || {}).day !== todayKey()) done = {};
   if (!adhkar.length) { $("dhikrText").textContent = "تعذّر تحميل الأذكار."; return; }
   page = Math.max(0, Math.min(page, adhkar.length - 1));
   const d = adhkar[page], left = leftOf(page);
   $("dhikrTitle").textContent = `${page + 1} من ${adhkar.length}${d.t ? " · " + d.t : ""}`;
   $("dhikrText").textContent = d.x;
   $("dhikrSrc").textContent = d.s || "";
+  $("dhikrNote").textContent = d.note || "";
+  $("dhikrNote").hidden = !d.note;
   $("dhikrLeft").textContent = left ? left : "✓";
   $("dhikrLabel").textContent = left ? (d.n > 1 ? "متبقي" : "مرة") : "تمّ";
   $("dhikrCard").classList.toggle("done", !left);
@@ -346,7 +359,7 @@ function renderAdhkar() {
 }
 function goTo(i) {
   if (i < 0 || i >= adhkar.length) return;
-  page = i; store.set("adhkarPage", { day: todayKey(), page });
+  page = i; store.set("adhkarPage_" + section, { day: todayKey(), page });
   renderAdhkar(); $("adhkarView").scrollTop = 0;
 }
 let advanceTimer = null;
@@ -372,11 +385,15 @@ $("dhikrCard").addEventListener("touchend", e => {
   const dx = e.changedTouches[0].clientX - touchX; touchX = null;
   if (Math.abs(dx) > 60) { e.preventDefault(); goTo(page + (dx > 0 ? 1 : -1)); }
 });
-async function openAdhkar() {
-  if (!adhkar.length) {
-    try { adhkar = await (await fetch("adhkar.json")).json(); } catch { adhkar = []; }
+async function openAdhkar(sec) {
+  if (!allAdhkar) {
+    try { allAdhkar = await (await fetch("adhkar.json")).json(); } catch { allAdhkar = {}; }
   }
-  const savedPage = store.get("adhkarPage", null);
+  section = sec;
+  adhkar = allAdhkar[sec] || [];
+  done = loadDone();
+  $("adhkarTitle").textContent = SECTION_TITLES[sec];
+  const savedPage = store.get("adhkarPage_" + sec, null);
   page = savedPage && savedPage.day === todayKey() ? savedPage.page : 0;
   renderAdhkar();
   $("adhkarView").hidden = false;
@@ -384,7 +401,7 @@ async function openAdhkar() {
   history.pushState({ adhkar: true }, "");
 }
 function closeAdhkar() { $("adhkarView").hidden = true; }
-$("adhkarBtn").onclick = openAdhkar;
+document.querySelectorAll(".adhkarBtn[data-sec]").forEach(b => { b.onclick = () => openAdhkar(b.dataset.sec); });
 $("adhkarBack").onclick = () => history.back();
 // زر الرجوع في الجوال يغلق صفحة الأذكار بدل إغلاق التطبيق
 window.addEventListener("popstate", closeAdhkar);
