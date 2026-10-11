@@ -36,15 +36,23 @@
   .adhkarHead { position:sticky; top:0; background:var(--bg); display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid var(--card); }
   .adhkarHead h2 { margin:0; font-size:1.2rem; color:var(--accent); }
   .adhkarHead small { color:var(--muted); }
-  .dhikr { background:var(--card); border-radius:12px; padding:12px 14px; margin:10px 0; cursor:pointer; user-select:none; }
-  .dhikr .top { display:flex; justify-content:space-between; align-items:center; color:var(--accent); font-size:.9rem; margin-bottom:4px; }
-  .dhikr .left { border:1px solid var(--accent); border-radius:999px; padding:1px 10px; font-variant-numeric:tabular-nums; }
-  .dhikr .txt { font-size:1.2rem; line-height:2; white-space:pre-line; }
-  .dhikr .src { color:var(--muted); font-size:.8rem; margin-top:4px; }
-  .dhikr.done { opacity:.45; }
-  .dhikr.done .left { background:var(--accent); color:var(--on-accent); }
-  .dhikr:active { outline:2px solid var(--accent); }
-</style>
+  .pager { display:flex; flex-direction:column; gap:12px; padding:12px 16px; min-height:calc(100% - 64px); box-sizing:border-box; }
+  .dhikr { flex:1; background:var(--card); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px;
+           cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
+  .dhikr .title { color:var(--accent); font-size:.95rem; }
+  .dhikr .txt { flex:1; font-size:1.3rem; line-height:2.1; white-space:pre-line; }
+  .dhikr .src { color:var(--muted); font-size:.85rem; }
+  .counter { align-self:center; width:96px; height:96px; border-radius:50%; border:3px solid var(--accent); color:var(--accent);
+             display:flex; flex-direction:column; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
+  .counter b { font-size:2rem; line-height:1; }
+  .counter span { font-size:.75rem; }
+  .dhikr.done .counter { background:var(--accent); color:var(--on-accent); }
+  .dhikr:active .counter { transform:scale(.96); }
+  .hint { text-align:center; color:var(--muted); font-size:.8rem; }
+  .nav { display:flex; gap:10px; }
+  .nav button { flex:1; padding:12px; font-size:1.05rem; }
+  .nav button:disabled { opacity:.35; }
+</style></style>
 </head>
 <body>
 <div class="wrap">
@@ -72,7 +80,6 @@
       </select>
     </label>
     <div class="status" id="notifyStatus"></div>
-    <button id="testBtn">جرّب التنبيه الآن (بعد 5 ثوانٍ)</button>
     <button id="exactBtn" hidden>اسمح بالتنبيه في الوقت الدقيق</button>
     </div>
   </details>
@@ -85,7 +92,19 @@
     <div style="text-align:center"><h2>أذكار المساء</h2><small id="adhkarProgress"></small></div>
     <button id="adhkarReset">إعادة</button>
   </div>
-  <div class="wrap" id="adhkarList"></div>
+  <div class="pager">
+    <div class="dhikr" id="dhikrCard">
+      <div class="title" id="dhikrTitle"></div>
+      <div class="txt" id="dhikrText"></div>
+      <div class="src" id="dhikrSrc"></div>
+      <div class="counter" id="dhikrCounter"><b id="dhikrLeft"></b><span id="dhikrLabel"></span></div>
+      <div class="hint">اضغط على الذكر للعدّ</div>
+    </div>
+    <div class="nav">
+      <button id="dhikrPrev">السابق</button>
+      <button id="dhikrNext">التالي</button>
+    </div>
+  </div>
 </div>
 
 <script src="capacitor.js"></script>
@@ -270,16 +289,6 @@ $("notifyOn").checked = settings.on;
 $("minutes").value = String(settings.minutes);
 $("notifyOn").onchange = e => { settings.on = e.target.checked; store.set("settings", settings); scheduleAll(); };
 $("minutes").onchange = e => { settings.minutes = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
-$("testBtn").onclick = async () => {
-  if (!Alarm) { $("notifyStatus").textContent = "التجربة تعمل داخل تطبيق الجوال فقط."; return; }
-  try {
-    await askPermission();
-    await Alarm.test({ seconds: 5, title: "تجربة التنبيه", body: "هكذا سيصلك التنبيه قبل الإقامة" });
-    $("notifyStatus").textContent = "سيرنّ التنبيه بعد 5 ثوانٍ على صوت المنبّه، حتى لو كان الجوال صامتاً. إن لم تسمعه ارفع صوت المنبّه.";
-  } catch {
-    $("notifyStatus").textContent = "تعذّرت التجربة. أغلق التطبيق وافتحه مرة أخرى.";
-  }
-};
 $("exactBtn").onclick = async () => {
   try { await Notif.changeExactNotificationSetting(); } catch {}
   scheduleAll();
@@ -295,33 +304,59 @@ function loadDone() {
 }
 let done = loadDone();
 function saveDone() { store.set("adhkarDone", { day: todayKey(), counts: done }); }
+let page = 0;
+function leftOf(i) { return adhkar[i].n - Math.min(done[i] || 0, adhkar[i].n); }
 function renderAdhkar() {
   if (store.get("adhkarDone", {}).day !== todayKey()) done = {};
-  let finished = 0;
-  $("adhkarList").innerHTML = adhkar.map((d, i) => {
-    const c = Math.min(done[i] || 0, d.n);
-    const left = d.n - c;
-    if (!left) finished++;
-    const label = left ? (d.n > 1 ? `متبقي ${left}` : "مرة") : "✓";
-    return `<div class="dhikr ${left ? "" : "done"}" data-i="${i}">
-      <div class="top"><span>${i + 1}${d.t ? " · " + d.t : ""}</span><span class="left">${label}</span></div>
-      <div class="txt"></div>${d.s ? `<div class="src">${d.s}</div>` : ""}</div>`;
-  }).join("");
-  // النص يوضع كنص عادي (لا HTML)
-  $("adhkarList").querySelectorAll(".dhikr").forEach(el => { el.querySelector(".txt").textContent = adhkar[+el.dataset.i].x; });
-  $("adhkarProgress").textContent = adhkar.length ? `${finished} من ${adhkar.length}` : "";
+  if (!adhkar.length) { $("dhikrText").textContent = "تعذّر تحميل الأذكار."; return; }
+  page = Math.max(0, Math.min(page, adhkar.length - 1));
+  const d = adhkar[page], left = leftOf(page);
+  $("dhikrTitle").textContent = `${page + 1} من ${adhkar.length}${d.t ? " · " + d.t : ""}`;
+  $("dhikrText").textContent = d.x;
+  $("dhikrSrc").textContent = d.s || "";
+  $("dhikrLeft").textContent = left ? left : "✓";
+  $("dhikrLabel").textContent = left ? (d.n > 1 ? "متبقي" : "مرة") : "تمّ";
+  $("dhikrCard").classList.toggle("done", !left);
+  $("dhikrPrev").disabled = page === 0;
+  $("dhikrNext").textContent = page === adhkar.length - 1 ? "انتهت الأذكار" : "التالي";
+  $("dhikrNext").disabled = page === adhkar.length - 1;
+  const finished = adhkar.filter((_, i) => !leftOf(i)).length;
+  $("adhkarProgress").textContent = `أكملت ${finished} من ${adhkar.length}`;
 }
-$("adhkarList").addEventListener("click", e => {
-  const el = e.target.closest(".dhikr"); if (!el) return;
-  const i = +el.dataset.i, d = adhkar[i];
-  if ((done[i] || 0) >= d.n) return;
-  done[i] = (done[i] || 0) + 1; saveDone(); renderAdhkar();
-  try { navigator.vibrate && navigator.vibrate(done[i] >= d.n ? 60 : 15); } catch {}
+function goTo(i) {
+  if (i < 0 || i >= adhkar.length) return;
+  page = i; store.set("adhkarPage", { day: todayKey(), page });
+  renderAdhkar(); $("adhkarView").scrollTop = 0;
+}
+let advanceTimer = null;
+$("dhikrCard").addEventListener("click", () => {
+  if (!leftOf(page)) return;
+  done[page] = (done[page] || 0) + 1; saveDone(); renderAdhkar();
+  const finishedNow = !leftOf(page);
+  try { navigator.vibrate && navigator.vibrate(finishedNow ? 60 : 15); } catch {}
+  // عند اكتمال العدد ننتقل وحدنا إلى الذكر التالي
+  if (finishedNow && page < adhkar.length - 1) {
+    clearTimeout(advanceTimer);
+    const from = page;
+    advanceTimer = setTimeout(() => { if (page === from) goTo(page + 1); }, 700);
+  }
+});
+$("dhikrPrev").onclick = () => goTo(page - 1);
+$("dhikrNext").onclick = () => goTo(page + 1);
+// السحب بالإصبع: نحو اليمين للتالي، ونحو اليسار للسابق (اتجاه الصفحات العربية)
+let touchX = null;
+$("dhikrCard").addEventListener("touchstart", e => { touchX = e.touches[0].clientX; }, { passive: true });
+$("dhikrCard").addEventListener("touchend", e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+  if (Math.abs(dx) > 60) { e.preventDefault(); goTo(page + (dx > 0 ? 1 : -1)); }
 });
 async function openAdhkar() {
   if (!adhkar.length) {
     try { adhkar = await (await fetch("adhkar.json")).json(); } catch { adhkar = []; }
   }
+  const savedPage = store.get("adhkarPage", null);
+  page = savedPage && savedPage.day === todayKey() ? savedPage.page : 0;
   renderAdhkar();
   $("adhkarView").hidden = false;
   $("adhkarView").scrollTop = 0;
@@ -332,7 +367,7 @@ $("adhkarBtn").onclick = openAdhkar;
 $("adhkarBack").onclick = () => history.back();
 // زر الرجوع في الجوال يغلق صفحة الأذكار بدل إغلاق التطبيق
 window.addEventListener("popstate", closeAdhkar);
-$("adhkarReset").onclick = () => { done = {}; saveDone(); renderAdhkar(); };
+$("adhkarReset").onclick = () => { done = {}; saveDone(); goTo(0); };
 
 showUpdated();
 render();
