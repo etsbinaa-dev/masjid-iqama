@@ -32,19 +32,20 @@
   .updated { text-align:center; color:var(--muted); font-size:.75rem; margin-top:8px; }
   .adhkarRow { display:flex; gap:8px; margin-top:8px; }
   .adhkarRow .adhkarBtn { flex:1; margin-top:0; padding:11px 6px; }
-  .dhikr .note { color:var(--muted); font-size:.9rem; }
   .adhkarBtn { display:block; width:100%; margin-top:8px; padding:11px 14px; font-size:1.05rem; background:var(--card); color:var(--accent); border:1px solid var(--accent); border-radius:10px; }
-  #adhkarView { position:fixed; inset:0; background:var(--bg); overflow-y:auto; z-index:10;
+  #adhkarView { position:fixed; inset:0; background:var(--bg); overflow:hidden; z-index:10; display:flex; flex-direction:column;
                 padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
   .adhkarHead { position:sticky; top:0; background:var(--bg); display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid var(--card); }
   .adhkarHead h2 { margin:0; font-size:1.2rem; color:var(--accent); }
   .adhkarHead small { color:var(--muted); }
-  .pager { display:flex; flex-direction:column; gap:12px; padding:12px 16px; min-height:calc(100% - 64px); box-sizing:border-box; }
-  .dhikr { flex:1; background:var(--card); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px;
+  #adhkarView[hidden] { display:none; }
+  .pager { flex:1; min-height:0; display:flex; flex-direction:column; gap:12px; padding:12px 16px; box-sizing:border-box; }
+  .dhikr { flex:1; min-height:0; background:var(--card); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px;
            cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
   .dhikr .title { color:var(--accent); font-size:.95rem; }
-  .dhikr .txt { flex:1; font-size:1.3rem; line-height:2.1; white-space:pre-line; }
-  .dhikr .src { color:var(--muted); font-size:.85rem; }
+  /* حجم الخط يُضبط بالبرنامج حتى يملأ المساحة دون تمرير */
+  .dhikr .txt { flex:1; min-height:0; overflow-y:auto; font-size:28px; line-height:1.9; white-space:pre-line;
+                text-align:center; display:flex; flex-direction:column; justify-content:safe center; }
   .counter { align-self:center; width:96px; height:96px; border-radius:50%; border:3px solid var(--accent); color:var(--accent);
              display:flex; flex-direction:column; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
   .counter b { font-size:2rem; line-height:1; }
@@ -108,9 +109,7 @@
   <div class="pager">
     <div class="dhikr" id="dhikrCard">
       <div class="title" id="dhikrTitle"></div>
-      <div class="note" id="dhikrNote"></div>
       <div class="txt" id="dhikrText"></div>
-      <div class="src" id="dhikrSrc"></div>
       <div class="counter" id="dhikrCounter"><b id="dhikrLeft"></b><span id="dhikrLabel"></span></div>
       <div class="hint">اضغط على الذكر للعدّ</div>
     </div>
@@ -345,9 +344,8 @@ function renderAdhkar() {
   const d = adhkar[page], left = leftOf(page);
   $("dhikrTitle").textContent = `${page + 1} من ${adhkar.length}${d.t ? " · " + d.t : ""}`;
   $("dhikrText").textContent = d.x;
-  $("dhikrSrc").textContent = d.s || "";
-  $("dhikrNote").textContent = d.note || "";
-  $("dhikrNote").hidden = !d.note;
+  fitText();
+
   $("dhikrLeft").textContent = left ? left : "✓";
   $("dhikrLabel").textContent = left ? (d.n > 1 ? "متبقي" : "مرة") : "تمّ";
   $("dhikrCard").classList.toggle("done", !left);
@@ -357,10 +355,23 @@ function renderAdhkar() {
   const finished = adhkar.filter((_, i) => !leftOf(i)).length;
   $("adhkarProgress").textContent = `أكملت ${finished} من ${adhkar.length}`;
 }
+// أكبر خط يتّسع فيه الذكر كاملاً في المساحة المتاحة (بين 16 و40 بكسل)
+function fitText() {
+  const el = $("dhikrText");
+  if ($("adhkarView").hidden) return;
+  let size = 40;
+  el.style.fontSize = size + "px";
+  while (size > 16 && el.scrollHeight > el.clientHeight + 1) {
+    size -= 1;
+    el.style.fontSize = size + "px";
+  }
+  el.scrollTop = 0;
+}
+window.addEventListener("resize", fitText);
 function goTo(i) {
   if (i < 0 || i >= adhkar.length) return;
   page = i; store.set("adhkarPage_" + section, { day: todayKey(), page });
-  renderAdhkar(); $("adhkarView").scrollTop = 0;
+  renderAdhkar();
 }
 let advanceTimer = null;
 $("dhikrCard").addEventListener("click", () => {
@@ -395,9 +406,8 @@ async function openAdhkar(sec) {
   $("adhkarTitle").textContent = SECTION_TITLES[sec];
   const savedPage = store.get("adhkarPage_" + sec, null);
   page = savedPage && savedPage.day === todayKey() ? savedPage.page : 0;
-  renderAdhkar();
   $("adhkarView").hidden = false;
-  $("adhkarView").scrollTop = 0;
+  renderAdhkar();
   history.pushState({ adhkar: true }, "");
 }
 function closeAdhkar() { $("adhkarView").hidden = true; }
