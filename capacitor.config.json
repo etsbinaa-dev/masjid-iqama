@@ -4,7 +4,8 @@
   "webDir": "www",
   "plugins": {
     "LocalNotifications": {
-      "iconColor": "#d4a84b"
+      "iconColor": "#d4a84b",
+      "sound": "iqama_chime.wav"
     }
   }
 }
