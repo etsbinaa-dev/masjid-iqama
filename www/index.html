@@ -30,6 +30,20 @@
   button { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 12px; font-size:.95rem; }
   .status { color:var(--muted); font-size:.9rem; line-height:1.6; }
   .updated { text-align:center; color:var(--muted); font-size:.75rem; margin-top:8px; }
+  .adhkarBtn { display:block; width:100%; margin-top:8px; padding:11px 14px; font-size:1.05rem; background:var(--card); color:var(--accent); border:1px solid var(--accent); border-radius:10px; }
+  #adhkarView { position:fixed; inset:0; background:var(--bg); overflow-y:auto; z-index:10;
+                padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  .adhkarHead { position:sticky; top:0; background:var(--bg); display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid var(--card); }
+  .adhkarHead h2 { margin:0; font-size:1.2rem; color:var(--accent); }
+  .adhkarHead small { color:var(--muted); }
+  .dhikr { background:var(--card); border-radius:12px; padding:12px 14px; margin:10px 0; cursor:pointer; user-select:none; }
+  .dhikr .top { display:flex; justify-content:space-between; align-items:center; color:var(--accent); font-size:.9rem; margin-bottom:4px; }
+  .dhikr .left { border:1px solid var(--accent); border-radius:999px; padding:1px 10px; font-variant-numeric:tabular-nums; }
+  .dhikr .txt { font-size:1.2rem; line-height:2; white-space:pre-line; }
+  .dhikr .src { color:var(--muted); font-size:.8rem; margin-top:4px; }
+  .dhikr.done { opacity:.45; }
+  .dhikr.done .left { background:var(--accent); color:var(--on-accent); }
+  .dhikr:active { outline:2px solid var(--accent); }
 </style>
 </head>
 <body>
@@ -41,6 +55,7 @@
   <div id="list"></div>
   <div class="note" id="note"></div>
 
+  <button class="adhkarBtn" id="adhkarBtn">أذكار المساء</button>
   <details class="settings" id="settingsBox">
     <summary id="settingsSummary">⚙ إعدادات التنبيه</summary>
     <div class="body">
@@ -62,6 +77,15 @@
     </div>
   </details>
   <div class="updated" id="updated"></div>
+</div>
+
+<div id="adhkarView" hidden>
+  <div class="adhkarHead">
+    <button id="adhkarBack">رجوع</button>
+    <div style="text-align:center"><h2>أذكار المساء</h2><small id="adhkarProgress"></small></div>
+    <button id="adhkarReset">إعادة</button>
+  </div>
+  <div class="wrap" id="adhkarList"></div>
 </div>
 
 <script src="capacitor.js"></script>
@@ -260,6 +284,55 @@ $("exactBtn").onclick = async () => {
   try { await Notif.changeExactNotificationSetting(); } catch {}
   scheduleAll();
 };
+
+// ---------- أذكار المساء ----------
+// اضغط على الذكر ليُنقص العدد حتى يكتمل. التقدّم يُحفظ لليوم نفسه ويبدأ من جديد في اليوم التالي.
+let adhkar = [];
+const todayKey = () => new Date().toDateString();
+function loadDone() {
+  const saved = store.get("adhkarDone", null);
+  return saved && saved.day === todayKey() ? saved.counts : {};
+}
+let done = loadDone();
+function saveDone() { store.set("adhkarDone", { day: todayKey(), counts: done }); }
+function renderAdhkar() {
+  if (store.get("adhkarDone", {}).day !== todayKey()) done = {};
+  let finished = 0;
+  $("adhkarList").innerHTML = adhkar.map((d, i) => {
+    const c = Math.min(done[i] || 0, d.n);
+    const left = d.n - c;
+    if (!left) finished++;
+    const label = left ? (d.n > 1 ? `متبقي ${left}` : "مرة") : "✓";
+    return `<div class="dhikr ${left ? "" : "done"}" data-i="${i}">
+      <div class="top"><span>${i + 1}${d.t ? " · " + d.t : ""}</span><span class="left">${label}</span></div>
+      <div class="txt"></div>${d.s ? `<div class="src">${d.s}</div>` : ""}</div>`;
+  }).join("");
+  // النص يوضع كنص عادي (لا HTML)
+  $("adhkarList").querySelectorAll(".dhikr").forEach(el => { el.querySelector(".txt").textContent = adhkar[+el.dataset.i].x; });
+  $("adhkarProgress").textContent = adhkar.length ? `${finished} من ${adhkar.length}` : "";
+}
+$("adhkarList").addEventListener("click", e => {
+  const el = e.target.closest(".dhikr"); if (!el) return;
+  const i = +el.dataset.i, d = adhkar[i];
+  if ((done[i] || 0) >= d.n) return;
+  done[i] = (done[i] || 0) + 1; saveDone(); renderAdhkar();
+  try { navigator.vibrate && navigator.vibrate(done[i] >= d.n ? 60 : 15); } catch {}
+});
+async function openAdhkar() {
+  if (!adhkar.length) {
+    try { adhkar = await (await fetch("adhkar.json")).json(); } catch { adhkar = []; }
+  }
+  renderAdhkar();
+  $("adhkarView").hidden = false;
+  $("adhkarView").scrollTop = 0;
+  history.pushState({ adhkar: true }, "");
+}
+function closeAdhkar() { $("adhkarView").hidden = true; }
+$("adhkarBtn").onclick = openAdhkar;
+$("adhkarBack").onclick = () => history.back();
+// زر الرجوع في الجوال يغلق صفحة الأذكار بدل إغلاق التطبيق
+window.addEventListener("popstate", closeAdhkar);
+$("adhkarReset").onclick = () => { done = {}; saveDone(); renderAdhkar(); };
 
 showUpdated();
 render();
