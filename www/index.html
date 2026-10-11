@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>أوقات الإقامة</title>
 <style>
+  /* خط أميري (رخصة OFL) مضمّن في التطبيق لنصوص القرآن والأذكار */
+  @font-face { font-family:"Amiri"; font-weight:400; font-display:swap; src:url("fonts/amiri-400.woff2") format("woff2"); }
+  @font-face { font-family:"Amiri"; font-weight:700; font-display:swap; src:url("fonts/amiri-700.woff2") format("woff2"); }
   :root { --bg:#0f2a24; --card:#163a32; --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
@@ -44,7 +47,7 @@
            cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
   .dhikr .title { color:var(--accent); font-size:.95rem; }
   /* حجم الخط يُضبط بالبرنامج حتى يملأ المساحة دون تمرير */
-  .dhikr .txt { flex:1; min-height:0; overflow-y:auto; font-size:28px; line-height:1.9; white-space:pre-line;
+  .dhikr .txt { flex:1; min-height:0; overflow-y:auto; font-size:28px; line-height:2; font-family:"Amiri","Noto Naskh Arabic",serif;
                 text-align:center; display:flex; flex-direction:column; justify-content:safe center; }
   .counter { align-self:center; width:96px; height:96px; border-radius:50%; border:3px solid var(--accent); color:var(--accent);
              display:flex; flex-direction:column; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
@@ -68,6 +71,10 @@
     .pager { gap:8px; padding:8px 12px; }
     .dhikr { padding:12px; gap:6px; }
   }
+  .dhikr .txt p { margin:0; }
+  .dhikr .txt .lead { color:var(--accent); font-size:.82em; }
+  .dhikr .txt .gap { height:.5em; }
+  .dhikr .txt .an { color:var(--accent); }
 </style></style>
 </head>
 <body>
@@ -351,7 +358,7 @@ function renderAdhkar() {
   page = Math.max(0, Math.min(page, adhkar.length - 1));
   const d = adhkar[page], left = leftOf(page);
   $("dhikrTitle").textContent = `${page + 1} من ${adhkar.length}${d.t ? " · " + d.t : ""}`;
-  $("dhikrText").textContent = d.x;
+  $("dhikrText").innerHTML = formatDhikr(d.x);
   fitText();
 
   $("dhikrLeft").textContent = left ? left : "✓";
@@ -363,12 +370,22 @@ function renderAdhkar() {
   const finished = adhkar.filter((_, i) => !leftOf(i)).length;
   $("adhkarProgress").textContent = `أكملت ${finished} من ${adhkar.length}`;
 }
+// تنسيق النص: كل سطر في فقرة، البسملة والاستعاذة بالذهبي، وأرقام الآيات بالذهبي
+const LEAD_LINES = ["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ"];
+function escapeHtml(t) { return t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function formatDhikr(text) {
+  return text.split("\n").map(line => {
+    if (!line.trim()) return '<div class="gap"></div>';
+    const html = escapeHtml(line).replace(/﴿[^﴾]*﴾/g, m => `<span class="an">${m}</span>`);
+    return `<p class="${LEAD_LINES.includes(line.trim()) ? "lead" : ""}">${html}</p>`;
+  }).join("");
+}
 // أكبر خط يتّسع فيه الذكر كاملاً دون تمرير: يصغر الخط ثم تقلّ المسافة بين الأسطر للنصوص الطويلة
 function fitText() {
   const el = $("dhikrText");
   if ($("adhkarView").hidden) return;
   const fits = () => el.scrollHeight <= el.clientHeight + 1;
-  let size = 40, lh = 1.9;
+  let size = 40, lh = 2;
   const apply = () => { el.style.fontSize = size + "px"; el.style.lineHeight = lh; };
   apply();
   while (!fits() && size > 11) {
@@ -379,6 +396,9 @@ function fitText() {
   el.scrollTop = 0;
 }
 window.addEventListener("resize", fitText);
+// بعد تحميل الخط نعيد الضبط لأن مقاسه يختلف عن الخط الاحتياطي
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitText);
+if (document.fonts) document.fonts.addEventListener && document.fonts.addEventListener("loadingdone", fitText);
 function goTo(i) {
   if (i < 0 || i >= adhkar.length) return;
   page = i; store.set("adhkarPage_" + section, { day: todayKey(), page });
@@ -419,6 +439,7 @@ async function openAdhkar(sec) {
   page = savedPage && savedPage.day === todayKey() ? savedPage.page : 0;
   $("adhkarView").hidden = false;
   renderAdhkar();
+  try { await document.fonts.load('28px "Amiri"'); fitText(); } catch {}
   history.pushState({ adhkar: true }, "");
 }
 function closeAdhkar() { $("adhkarView").hidden = true; }
