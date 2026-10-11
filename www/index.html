@@ -171,16 +171,15 @@ function minus(hhmm, mins) {
   const t = ((h * 60 + m - mins) % 1440 + 1440) % 1440;
   return { hour: Math.floor(t / 60), minute: t % 60 };
 }
-function buildNotifications() {
+function buildAlarms() {
   const n = settings.minutes;
   const items = [];
   const add = (id, name, iqama, weekday) => {
     const at = minus(iqama, n);
     items.push({
-      id, channelId: CHANNEL, sound: SOUND,
+      id, hour: at.hour, minute: at.minute, weekday: weekday || 0,
       title: `إقامة ${name} بعد ${n} دقائق`,
-      body: `${cfg.mosqueName} — الإقامة ${fmt12(iqama)}`,
-      schedule: { on: weekday ? { weekday, ...at } : at, allowWhileIdle: true }
+      body: `${cfg.mosqueName} — الإقامة ${fmt12(iqama)}`
     });
   };
   const [fajr, dhuhr, asr, maghrib, isha] = cfg.prayers;
@@ -193,39 +192,50 @@ function buildNotifications() {
   add(26, "الجمعة", cfg.jumuah, 6);
   return items;
 }
-// قناة التنبيه تُنشأ في كود أندرويد (MainActivity) بصوت "المنبّه" حتى تُسمع في الوضع الصامت.
-// هنا نحذف القنوات القديمة فقط، لأن إعدادات القناة لا تتغيّر بعد إنشائها.
-const CHANNEL = "iqama_alarm";
-const SOUND = "hayya_salah.ogg";
-async function ensureChannel() {
-  for (const old of ["iqama", "iqama_sound", "iqama_hayya"]) { try { await Notif.deleteChannel({ id: old }); } catch {} }
-}
-async function cancelAll() {
-  const pending = await Notif.getPending();
-  const ids = pending.notifications.filter(x => x.id !== 99).map(x => ({ id: x.id })); // 99 = التنبيه التجريبي
-  if (ids.length) {
-    await Notif.cancel({ notifications: ids });
+
+// نظام التنبيه الخاص بالتطبيق (كود أندرويد): يشغّل "حي على الصلاة" على صوت المنبّه فيُسمع في الوضع الصامت.
+const Alarm = Notif ? window.Capacitor.registerPlugin("IqamaAlarm") : null;
+
+// تنظيف ما بقي من النسخ القديمة: تنبيهاتها المجدولة وقنواتها
+async function cleanupOld() {
+  try {
+    const pending = await Notif.getPending();
+    if (pending.notifications.length) {
+      await Notif.cancel({ notifications: pending.notifications.map(x => ({ id: x.id })) });
+    }
+  } catch {}
+  for (const old of ["iqama", "iqama_sound", "iqama_hayya", "iqama_alarm"]) {
+    try { await Notif.deleteChannel({ id: old }); } catch {}
   }
 }
+async function askPermission() {
+  let perm = await Notif.checkPermissions();
+  if (perm.display !== "granted") perm = await Notif.requestPermissions();
+  return perm.display === "granted";
+}
 async function scheduleAll() {
-  if (!Notif) { $("notifyStatus").textContent = "التنبيهات تعمل داخل تطبيق الجوال فقط."; return; }
+  if (!Alarm) { $("notifyStatus").textContent = "التنبيهات تعمل داخل تطبيق الجوال فقط."; return; }
   try {
-    await cancelAll();
-    if (!settings.on) { $("notifyStatus").textContent = "التنبيه متوقف."; $("settingsSummary").textContent = "⚙ التنبيه متوقف"; return; }
-    let perm = await Notif.checkPermissions();
-    if (perm.display !== "granted") perm = await Notif.requestPermissions();
-    if (perm.display !== "granted") {
-      $("settingsBox").open = true;
-      $("notifyStatus").textContent = "لم تسمح للتطبيق بالإشعارات. فعّلها من إعدادات الجوال ← التطبيقات ← أوقات الإقامة ← الإشعارات.";
+    await cleanupOld();
+    if (!settings.on) {
+      await Alarm.cancelAll();
+      $("notifyStatus").textContent = "التنبيه متوقف.";
+      $("settingsSummary").textContent = "⚙ التنبيه متوقف";
       return;
     }
-    await ensureChannel();
-    await Notif.schedule({ notifications: buildNotifications() });
-    $("notifyStatus").textContent = `سيصلك تنبيه قبل كل إقامة بـ ${settings.minutes} دقائق.`;
+    // الصوت يعمل حتى دون إذن الإشعارات، لكن الإشعار المكتوب يحتاجه
+    const granted = await askPermission();
+    await Alarm.schedule({ alarms: buildAlarms() });
+    if (granted) {
+      $("notifyStatus").textContent = `سيرنّ التطبيق قبل كل إقامة بـ ${settings.minutes} دقائق، حتى في الوضع الصامت.`;
+    } else {
+      $("settingsBox").open = true;
+      $("notifyStatus").textContent = "سيرنّ الصوت، لكن الإشعار المكتوب لن يظهر لأنك لم تسمح بالإشعارات. فعّلها من إعدادات الجوال ← التطبيقات ← أوقات الإقامة ← الإشعارات.";
+    }
     $("settingsSummary").textContent = `⚙ التنبيه قبل الإقامة بـ ${settings.minutes} دقائق`;
     try {
       const exact = await Notif.checkExactNotificationSetting();
-      $("exactBtn").hidden = exact.exact_notification === "granted";
+      $("exactBtn").hidden = exact.exact_alarm === "granted";
     } catch {}
   } catch (e) {
     $("notifyStatus").textContent = "تعذّر ضبط التنبيهات. أغلق التطبيق وافتحه مرة أخرى.";
@@ -237,19 +247,11 @@ $("minutes").value = String(settings.minutes);
 $("notifyOn").onchange = e => { settings.on = e.target.checked; store.set("settings", settings); scheduleAll(); };
 $("minutes").onchange = e => { settings.minutes = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
 $("testBtn").onclick = async () => {
-  if (!Notif) { $("notifyStatus").textContent = "التجربة تعمل داخل تطبيق الجوال فقط."; return; }
+  if (!Alarm) { $("notifyStatus").textContent = "التجربة تعمل داخل تطبيق الجوال فقط."; return; }
   try {
-    let perm = await Notif.checkPermissions();
-    if (perm.display !== "granted") perm = await Notif.requestPermissions();
-    if (perm.display !== "granted") { $("notifyStatus").textContent = "اسمح للتطبيق بالإشعارات أولاً."; return; }
-    await ensureChannel();
-    await Notif.schedule({ notifications: [{
-      id: 99, channelId: CHANNEL, sound: SOUND,
-      title: "تجربة التنبيه",
-      body: "هكذا سيصلك التنبيه قبل الإقامة",
-      schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true }
-    }] });
-    $("notifyStatus").textContent = "سيصلك تنبيه تجريبي بعد 5 ثوانٍ. التنبيه يستعمل صوت المنبّه، فإن لم تسمعه ارفع صوت المنبّه في الجوال.";
+    await askPermission();
+    await Alarm.test({ seconds: 5, title: "تجربة التنبيه", body: "هكذا سيصلك التنبيه قبل الإقامة" });
+    $("notifyStatus").textContent = "سيرنّ التنبيه بعد 5 ثوانٍ على صوت المنبّه، حتى لو كان الجوال صامتاً. إن لم تسمعه ارفع صوت المنبّه.";
   } catch {
     $("notifyStatus").textContent = "تعذّرت التجربة. أغلق التطبيق وافتحه مرة أخرى.";
   }
