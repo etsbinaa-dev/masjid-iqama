@@ -125,7 +125,8 @@ public class AlarmReceiver extends BroadcastReceiver {
         PendingIntent stopPi = PendingIntent.getBroadcast(c, 1000, stop, flags);
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setSmallIcon(R.drawable.ic_stat_iqama)
+            .setColor(0xFFD4A84B)
             .setContentTitle(a.optString("title"))
             .setContentText(a.optString("body"))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
