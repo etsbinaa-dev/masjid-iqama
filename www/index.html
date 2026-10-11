@@ -193,11 +193,11 @@ function buildNotifications() {
   add(26, "الجمعة", cfg.jumuah, 6);
   return items;
 }
-// قناة بصوت خاص. إعدادات القناة لا تتغيّر بعد إنشائها، لذلك قناة جديدة باسم جديد، ونحذف القديمة الصامتة
-const CHANNEL = "iqama_sound";
-const SOUND = "iqama_chime.wav";
+// قناة بصوت "حي على الصلاة". إعدادات القناة لا تتغيّر بعد إنشائها، لذلك قناة جديدة باسم جديد، ونحذف القديمة الصامتة
+const CHANNEL = "iqama_hayya";
+const SOUND = "hayya_salah.ogg";
 async function ensureChannel() {
-  try { await Notif.deleteChannel({ id: "iqama" }); } catch {}
+  for (const old of ["iqama", "iqama_sound"]) { try { await Notif.deleteChannel({ id: old }); } catch {} }
   await Notif.createChannel({ id: CHANNEL, name: "تنبيه الإقامة", description: "تنبيه قبل إقامة الصلاة",
     importance: 5, visibility: 1, vibration: true, sound: SOUND });
 }

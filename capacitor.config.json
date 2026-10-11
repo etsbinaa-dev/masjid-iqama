@@ -5,7 +5,7 @@
   "plugins": {
     "LocalNotifications": {
       "iconColor": "#d4a84b",
-      "sound": "iqama_chime.wav"
+      "sound": "hayya_salah.ogg"
     }
   }
 }
