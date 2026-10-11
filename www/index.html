@@ -52,6 +52,10 @@
   .nav { display:flex; gap:10px; }
   .nav button { flex:1; padding:12px; font-size:1.05rem; }
   .nav button:disabled { opacity:.35; }
+  .chipsLabel { font-size:.95rem; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips button { border-radius:999px; padding:6px 12px; font-size:.95rem; background:var(--accent); color:var(--on-accent); border:1px solid var(--accent); }
+  .chips button.off { background:transparent; color:var(--muted); border-color:var(--muted); text-decoration:line-through; }
 </style></style>
 </head>
 <body>
@@ -70,6 +74,8 @@
     <label for="notifyOn">تفعيل التنبيه
       <input type="checkbox" id="notifyOn">
     </label>
+    <div class="chipsLabel">التنبيه لهذه الصلوات (اضغط لإيقاف أو تشغيل):</div>
+    <div class="chips" id="prayerChips"></div>
     <label for="minutes">قبل الإقامة بـ
       <select id="minutes">
         <option value="5">5 دقائق</option>
@@ -134,6 +140,10 @@ const store = {
 
 let cfg = store.get("times", DEFAULTS);
 let settings = store.get("settings", { on: true, minutes: 10 });
+// تنبيه كل صلاة على حدة (كلها مفعّلة افتراضياً)
+const PRAYER_KEYS = ["fajr", "dhuhr", "asr", "maghrib", "isha", "jumuah"];
+const PRAYER_NAMES = { fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء", jumuah: "الجمعة" };
+settings.prayers = Object.assign(Object.fromEntries(PRAYER_KEYS.map(k => [k, true])), settings.prayers || {});
 let updatedAt = store.get("updatedAt", null);
 
 const Notif = window.Capacitor && window.Capacitor.isNativePlatform()
@@ -226,13 +236,14 @@ function buildAlarms() {
     });
   };
   const [fajr, dhuhr, asr, maghrib, isha] = cfg.prayers;
-  add(1, fajr.name, fajr.iqama);
-  add(3, asr.name, asr.iqama);
-  add(4, maghrib.name, maghrib.iqama);
-  add(5, isha.name, isha.iqama);
+  const on = settings.prayers;
+  if (on.fajr) add(1, fajr.name, fajr.iqama);
+  if (on.asr) add(3, asr.name, asr.iqama);
+  if (on.maghrib) add(4, maghrib.name, maghrib.iqama);
+  if (on.isha) add(5, isha.name, isha.iqama);
   // الظهر كل الأيام عدا الجمعة (1=الأحد ... 6=الجمعة، 7=السبت)
-  [1, 2, 3, 4, 5, 7].forEach(d => add(20 + d, dhuhr.name, dhuhr.iqama, d));
-  add(26, "الجمعة", cfg.jumuah, 6);
+  if (on.dhuhr) [1, 2, 3, 4, 5, 7].forEach(d => add(20 + d, dhuhr.name, dhuhr.iqama, d));
+  if (on.jumuah) add(26, "الجمعة", cfg.jumuah, 6);
   return items;
 }
 
@@ -285,6 +296,16 @@ async function scheduleAll() {
   }
 }
 
+function renderChips() {
+  $("prayerChips").innerHTML = PRAYER_KEYS.map(k =>
+    `<button type="button" data-k="${k}" class="${settings.prayers[k] ? "" : "off"}" aria-pressed="${settings.prayers[k]}">${PRAYER_NAMES[k]}</button>`).join("");
+}
+$("prayerChips").addEventListener("click", e => {
+  const k = e.target.dataset && e.target.dataset.k; if (!k) return;
+  settings.prayers[k] = !settings.prayers[k];
+  store.set("settings", settings); renderChips(); scheduleAll();
+});
+renderChips();
 $("notifyOn").checked = settings.on;
 $("minutes").value = String(settings.minutes);
 $("notifyOn").onchange = e => { settings.on = e.target.checked; store.set("settings", settings); scheduleAll(); };
