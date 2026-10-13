@@ -51,7 +51,12 @@ public final class IqamaAlarms {
 
     /** يجدول الموعد القادم لتنبيه متكرر. */
     static void scheduleNext(Context c, JSONObject a) {
-        long at = nextTime(a.optInt("hour"), a.optInt("minute"), a.optInt("weekday", 0));
+        scheduleNext(c, a, System.currentTimeMillis());
+    }
+
+    /** يجدول أول موعد بعد اللحظة after (عند الرنين نمرّر الآن + دقيقة حتى لا يتكرر في نفس الدقيقة). */
+    static void scheduleNext(Context c, JSONObject a, long after) {
+        long at = nextTime(a.optInt("hour"), a.optInt("minute"), a.optInt("weekday", 0), after);
         setAlarm(c, a, at);
     }
 
@@ -66,8 +71,7 @@ public final class IqamaAlarms {
         }
     }
 
-    static long nextTime(int hour, int minute, int weekday) {
-        long now = System.currentTimeMillis();
+    static long nextTime(int hour, int minute, int weekday, long now) {
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, hour);
         cal.set(Calendar.MINUTE, minute);

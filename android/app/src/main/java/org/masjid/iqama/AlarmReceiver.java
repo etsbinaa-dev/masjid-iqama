@@ -34,6 +34,7 @@ public class AlarmReceiver extends BroadcastReceiver {
     private static PowerManager.WakeLock wakeLock;
     private static PendingResult pending;
     private static final Handler handler = new Handler(Looper.getMainLooper());
+    private static final java.util.Map<Integer, Long> lastFired = new java.util.HashMap<>();
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -48,7 +49,15 @@ public class AlarmReceiver extends BroadcastReceiver {
         } catch (Exception e) {
             return;
         }
-        if (a.optBoolean("repeat", true)) IqamaAlarms.scheduleNext(c, a);
+        long now = System.currentTimeMillis();
+        // الموعد القادم بعد دقيقة على الأقل، حتى لو وصل التنبيه قبل وقته بلحظة
+        if (a.optBoolean("repeat", true)) IqamaAlarms.scheduleNext(c, a, now + 60_000L);
+        // حماية: لا يرنّ نفس التنبيه مرتين خلال دقيقة
+        synchronized (lastFired) {
+            Long last = lastFired.get(a.optInt("id"));
+            if (last != null && now - last < 60_000L) return;
+            lastFired.put(a.optInt("id"), now);
+        }
         showNotification(c, a);
         playSound(c, goAsync());
     }
