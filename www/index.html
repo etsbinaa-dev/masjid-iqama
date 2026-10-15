@@ -152,6 +152,7 @@
   </details>
   <div class="updated" id="updated"></div>
   <div class="updated" id="version"></div>
+  <div class="updated" id="otaStatus"></div>
 </div>
 
 <div id="sheet" hidden>
@@ -744,30 +745,47 @@ async function nativeLevel() {
   if (!Updater) return 1;
   try { return parseInt(String((await Updater.current()).native).split(".")[0], 10) || 1; } catch { return 1; }
 }
+// سطر صغير يبيّن حالة التحديث تحت رقم النسخة (ويساعد على معرفة سبب أي مشكلة)
+function otaStatus(t) { $("otaStatus").textContent = t; }
 async function checkUpdate() {
+  let step = "قراءة رقم النسخة";
   try {
     appVersion = (await (await fetch("version.json", { cache: "no-store" })).json()).version || 0;
     if (appVersion) $("version").textContent = `النسخة ${appVersion}`;
     if (!appVersion || !Alarm) return;            // لا تحديث خارج تطبيق الجوال
+    step = "السؤال عن آخر نسخة";
     const res = await fetch("https://api.github.com/repos/etsbinaa-dev/masjid-iqama/releases/latest", { cache: "no-store" });
-    if (!res.ok) return;
+    if (!res.ok) throw new Error("GitHub " + res.status);
     const rel = await res.json();
     const latest = parseInt(String(rel.tag_name || "").replace(/\D/g, ""), 10);
-    if (!(latest > appVersion)) return;
+    if (!(latest > appVersion)) { otaStatus("التطبيق محدّث"); return; }
     const web = (rel.assets || []).map(a => ({ a, m: /^web-n(\d+)\.zip$/.exec(a.name) })).find(x => x.m);
+    step = "معرفة النظام الداخلي";
     const myNative = await nativeLevel();
     if (Updater && web && parseInt(web.m[1], 10) <= myNative) {
-      // تحديث الواجهة بصمت (مرة واحدة لكل نسخة)
       const v = String(latest);
-      const have = ((await Updater.list()).bundles || []).find(b => b.version === v && b.status !== "error");
-      const bundle = have || await Updater.download({ url: web.a.browser_download_url, version: v });
+      step = "البحث عن تنزيل سابق";
+      const bundles = ((await Updater.list()) || {}).bundles || [];
+      let bundle = bundles.find(b => b.version === v && b.status === "success");
+      // محاولة سابقة فاشلة لنفس النسخة: نحذفها ثم نعيد التنزيل
+      for (const b of bundles) if (b.version === v && b.status !== "success") { try { await Updater.delete({ id: b.id }); } catch {} }
+      if (!bundle) {
+        step = "تنزيل التحديث";
+        otaStatus(`جارٍ تنزيل التحديث ${latest}…`);
+        bundle = await Updater.download({ url: web.a.browser_download_url, version: v });
+      }
+      step = "تجهيز التحديث";
       await Updater.next({ id: bundle.id });   // يُطبَّق حين يُغلق التطبيق أو يُرسَل للخلفية
+      otaStatus(`التحديث ${latest} جاهز — أغلق التطبيق وافتحه`);
       return;
     }
     // يحتاج نظاماً داخلياً أحدث: تنزيل ملف التطبيق
+    otaStatus("");
     $("updateBar").textContent = `تحديث مهم للتطبيق (${latest}) — اضغط للتنزيل`;
     $("updateBar").hidden = false;
-  } catch {}
+  } catch (e) {
+    otaStatus(`تعذّر التحديث (${step}): ${(e && (e.message || e.code)) || e}`.slice(0, 160));
+  }
 }
 // يفتح رابط التحميل في المتصفح، ثم يفتح الشخص الملف ويضغط "تثبيت"
 $("updateBar").onclick = () => { window.location.href = APK_URL; };
