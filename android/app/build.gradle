@@ -2,6 +2,8 @@ apply plugin: 'com.android.application'
 
 // رقم النسخة يزيد مع كل بناء حتى يقبل الجوال التحديث
 def buildNumber = (project.findProperty("versionCode") ?: "1").toString().toInteger()
+// مستوى النظام الداخلي (ملف NATIVE_LEVEL): يُرفع فقط حين يتغيّر كود أندرويد، فتحتاج النسخ القديمة تحديثاً يدوياً
+def nativeLevel = rootProject.file("../NATIVE_LEVEL").text.trim()
 
 android {
     namespace "org.masjid.iqama"
@@ -11,7 +13,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode buildNumber
-        versionName "1." + buildNumber
+        versionName nativeLevel + "." + buildNumber
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

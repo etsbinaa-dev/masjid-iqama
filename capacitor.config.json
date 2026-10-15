@@ -6,6 +6,14 @@
     "LocalNotifications": {
       "iconColor": "#d4a84b",
       "sound": "hayya_salah.ogg"
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "statsUrl": "",
+      "updateUrl": "",
+      "channelUrl": "",
+      "appReadyTimeout": 10000,
+      "disableJSLogging": true
     }
   }
 }

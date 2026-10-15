@@ -69,7 +69,7 @@ jobs:
       - name: كتابة رقم النسخة داخل التطبيق
         if: steps.check.outputs.ok == 'true'
         run: |
-          echo '{"version": ${{ github.run_number }}}' > www/version.json
+          echo "{\"version\": ${{ github.run_number }}, \"native\": $(cat NATIVE_LEVEL)}" > www/version.json
 
       - name: نسخ صفحة التطبيق إلى أندرويد
         if: steps.check.outputs.ok == 'true'
@@ -82,6 +82,8 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease -PversionCode=${{ github.run_number }}
           cp app/build/outputs/apk/release/app-release.apk ../masjid-iqama.apk
+          # ملف الواجهة للتحديث التلقائي؛ رقم n في الاسم = مستوى النظام الداخلي الذي يحتاجه
+          cd ../www && zip -qr "../web-n$(cat ../NATIVE_LEVEL).zip" . && cd ..
 
       - name: حفظ المفتاح المشفّر (أول مرة فقط)
         if: steps.check.outputs.ok == 'true' && env.NEW_KEY == '1'
@@ -99,5 +101,7 @@ jobs:
           tag_name: v${{ github.run_number }}
           name: النسخة ${{ github.run_number }}
           body: حمّل ملف masjid-iqama.apk وثبّته على جوال أندرويد.
-          files: masjid-iqama.apk
+          files: |
+            masjid-iqama.apk
+            web-n*.zip
           make_latest: true

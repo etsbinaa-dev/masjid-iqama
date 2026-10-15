@@ -728,22 +728,43 @@ $("adhkarBack").onclick = () => history.back();
 window.addEventListener("popstate", () => { closeAdhkar(); closeSheet(); });
 $("adhkarReset").onclick = () => { done = {}; saveDone(); goTo(0); };
 
-// ---------- رقم النسخة والتنبيه بالتحديث ----------
-// version.json يكتبه البناء التلقائي (رقم النسخة في GitHub). عند الفتح نقارن بآخر نسخة منشورة.
+// ---------- رقم النسخة والتحديث ----------
+// version.json يكتبه البناء التلقائي: رقم النسخة ومستوى النظام الداخلي الذي تحتاجه هذه الواجهة.
+// تحديث الواجهة: ينزل تلقائياً في الخلفية ويُطبَّق في الفتحة التالية (أداة Capgo، من GitHub مباشرة، دون أي إحصاءات).
+// تحديث النظام الداخلي (كود أندرويد): يظهر شريط ذهبي لتنزيل ملف التطبيق يدوياً.
 const APK_URL = "https://github.com/etsbinaa-dev/masjid-iqama/releases/latest/download/masjid-iqama.apk";
+const Updater = Alarm ? window.Capacitor.registerPlugin("CapacitorUpdater") : null;
+// نخبر الأداة أن هذه الواجهة تعمل؛ وإلا ترجع وحدها إلى النسخة السابقة
+if (Updater) { try { Updater.notifyAppReady(); } catch {} }
 let appVersion = 0;
+async function nativeLevel() {
+  // اسم نسخة التطبيق مثل "2.25": الرقم الأول هو مستوى النظام الداخلي. النسخ القديمة بلا أداة التحديث = 1
+  if (!Updater) return 1;
+  try { return parseInt(String((await Updater.current()).native).split(".")[0], 10) || 1; } catch { return 1; }
+}
 async function checkUpdate() {
   try {
     appVersion = (await (await fetch("version.json", { cache: "no-store" })).json()).version || 0;
     if (appVersion) $("version").textContent = `النسخة ${appVersion}`;
-    if (!appVersion || !Alarm) return;            // لا نعرض التنبيه خارج تطبيق الجوال
+    if (!appVersion || !Alarm) return;            // لا تحديث خارج تطبيق الجوال
     const res = await fetch("https://api.github.com/repos/etsbinaa-dev/masjid-iqama/releases/latest", { cache: "no-store" });
     if (!res.ok) return;
-    const latest = parseInt(String((await res.json()).tag_name || "").replace(/\D/g, ""), 10);
-    if (latest > appVersion) {
-      $("updateBar").textContent = `نسخة جديدة متوفرة (${latest}) — اضغط للتحديث`;
-      $("updateBar").hidden = false;
+    const rel = await res.json();
+    const latest = parseInt(String(rel.tag_name || "").replace(/\D/g, ""), 10);
+    if (!(latest > appVersion)) return;
+    const web = (rel.assets || []).map(a => ({ a, m: /^web-n(\d+)\.zip$/.exec(a.name) })).find(x => x.m);
+    const myNative = await nativeLevel();
+    if (Updater && web && parseInt(web.m[1], 10) <= myNative) {
+      // تحديث الواجهة بصمت (مرة واحدة لكل نسخة)
+      const v = String(latest);
+      const have = ((await Updater.list()).bundles || []).find(b => b.version === v && b.status !== "error");
+      const bundle = have || await Updater.download({ url: web.a.browser_download_url, version: v });
+      await Updater.next({ id: bundle.id });   // يُطبَّق حين يُغلق التطبيق أو يُرسَل للخلفية
+      return;
     }
+    // يحتاج نظاماً داخلياً أحدث: تنزيل ملف التطبيق
+    $("updateBar").textContent = `تحديث مهم للتطبيق (${latest}) — اضغط للتنزيل`;
+    $("updateBar").hidden = false;
   } catch {}
 }
 // يفتح رابط التحميل في المتصفح، ثم يفتح الشخص الملف ويضغط "تثبيت"
