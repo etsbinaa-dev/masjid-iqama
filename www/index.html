@@ -86,7 +86,13 @@
   .dhikr .txt .lead { color:var(--accent); font-size:.82em; }
   .dhikr .txt .gap { height:.5em; }
   .dhikr .txt .an { color:var(--accent); }
-  .where button { background:none; border:none; color:var(--accent); font-size:.85rem; padding:2px 4px; }
+  .mosqueSwitch { align-self:center; display:flex; align-items:center; gap:8px; background:none; border:none; color:var(--text);
+                  padding:2px 14px; border-radius:999px; }
+  .mosqueSwitch:active { background:var(--card); }
+  .mosqueSwitch .chev { color:var(--accent); font-size:1.3rem; line-height:1; transform:translateY(-4px); }
+  .updateBar { display:block; width:100%; background:var(--accent); color:var(--on-accent); border:none; border-radius:14px;
+               padding:10px 14px; font-size:1rem; font-weight:700; text-align:center; }
+  .updateBar[hidden] { display:none; }
   #sheet { position:fixed; inset:0; background:var(--bg); z-index:11; display:flex; flex-direction:column;
            padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
   #sheet[hidden] { display:none; }
@@ -108,9 +114,10 @@
 </head>
 <body>
 <div class="wrap">
+  <button class="updateBar" id="updateBar" hidden></button>
   <div class="top">
-    <h1 id="name"></h1>
-    <div class="where"><span id="whereText"></span> <button id="mosquesBtn">تغيير المسجد ‹</button></div>
+    <button class="mosqueSwitch" id="mosquesBtn" aria-label="تغيير المسجد"><h1 id="name"></h1><span class="chev">⌄</span></button>
+    <div class="where"><span id="whereText"></span></div>
     <div class="date" id="date"></div>
   </div>
   <div class="next" id="next"></div>
@@ -144,6 +151,7 @@
     </div>
   </details>
   <div class="updated" id="updated"></div>
+  <div class="updated" id="version"></div>
 </div>
 
 <div id="sheet" hidden>
@@ -323,8 +331,8 @@ function applyMosque(reschedule = true) {
   cfg = { mosqueName: current.name, note: current.note || "", prayers: current.prayers, jumuah: current.jumuah };
   store.set("lastMosque", current.id);
   $("whereText").textContent =
-    currentWhy === "near" ? `📍 الأقرب إليك · ${fmtDist(currentDist)} ·` :
-    currentWhy === "fixed" ? "اخترته يدوياً ·" : "";
+    currentWhy === "near" ? `📍 الأقرب إليك · ${fmtDist(currentDist)}` :
+    currentWhy === "fixed" ? "اخترته يدوياً" : "اضغط على اسم المسجد لاختيار مسجدك";
   const sig = JSON.stringify(cfg);
   render();
   if (reschedule && lastSig !== null && sig !== lastSig) scheduleAll();
@@ -720,12 +728,34 @@ $("adhkarBack").onclick = () => history.back();
 window.addEventListener("popstate", () => { closeAdhkar(); closeSheet(); });
 $("adhkarReset").onclick = () => { done = {}; saveDone(); goTo(0); };
 
+// ---------- رقم النسخة والتنبيه بالتحديث ----------
+// version.json يكتبه البناء التلقائي (رقم النسخة في GitHub). عند الفتح نقارن بآخر نسخة منشورة.
+const APK_URL = "https://github.com/etsbinaa-dev/masjid-iqama/releases/latest/download/masjid-iqama.apk";
+let appVersion = 0;
+async function checkUpdate() {
+  try {
+    appVersion = (await (await fetch("version.json", { cache: "no-store" })).json()).version || 0;
+    if (appVersion) $("version").textContent = `النسخة ${appVersion}`;
+    if (!appVersion || !Alarm) return;            // لا نعرض التنبيه خارج تطبيق الجوال
+    const res = await fetch("https://api.github.com/repos/etsbinaa-dev/masjid-iqama/releases/latest", { cache: "no-store" });
+    if (!res.ok) return;
+    const latest = parseInt(String((await res.json()).tag_name || "").replace(/\D/g, ""), 10);
+    if (latest > appVersion) {
+      $("updateBar").textContent = `نسخة جديدة متوفرة (${latest}) — اضغط للتحديث`;
+      $("updateBar").hidden = false;
+    }
+  } catch {}
+}
+// يفتح رابط التحميل في المتصفح، ثم يفتح الشخص الملف ويضغط "تثبيت"
+$("updateBar").onclick = () => { window.location.href = APK_URL; };
+
 showUpdated();
 applyMosque(false);
 setInterval(render, 1000);
 scheduleAll();
 refreshMosques();
 locate();
+checkUpdate();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshMosques(); locate(); } });
 </script>
 </body>

@@ -66,6 +66,11 @@ jobs:
         if: steps.check.outputs.ok == 'true'
         run: npm ci
 
+      - name: كتابة رقم النسخة داخل التطبيق
+        if: steps.check.outputs.ok == 'true'
+        run: |
+          echo '{"version": ${{ github.run_number }}}' > www/version.json
+
       - name: نسخ صفحة التطبيق إلى أندرويد
         if: steps.check.outputs.ok == 'true'
         run: npx cap sync android
