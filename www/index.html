@@ -377,7 +377,7 @@ function openDirections(m) {
 }
 $("nearBtn").onclick = () => {
   if (!nearest) { $("nearName").textContent = "جارٍ تحديد موقعك…"; locate(); return; }
-  openDirections(nearest.m);
+  openMosquePage(nearest.m.id);
 };
 async function fetchGithubMosques() {
   const res = await fetch(MOSQUES_URL + "?t=" + Date.now(), { cache: "no-store" });
@@ -452,6 +452,38 @@ async function submitSuggestion(s) {
 
 // ---------- شاشة المساجد ----------
 let sheetView = "list";
+// صفحة مسجد: أوقاته والإقامة القادمة فيه، ثم زر الطريق إليه
+function openMosquePage(id) { sheetView = "detail"; renderMosquePage(id); $("sheet").hidden = false; history.pushState({ sheet: true }, ""); }
+function renderMosquePage(id) {
+  const m = allMosques().find(x => x.id === id);
+  if (!m) return;
+  const now = new Date();
+  const list = m.prayers.map(p => ({ ...p }));
+  if (now.getDay() === 5) list[1] = { name: "الجمعة", iqama: m.jumuah };
+  let nextI = list.findIndex(p => toDate(p.iqama, now) > now);
+  const nextP = nextI === -1 ? list[0] : list[nextI];
+  const nextT = toDate(nextP.iqama, now); if (nextI === -1) nextT.setDate(nextT.getDate() + 1);
+  if (nextI === -1) nextI = 0;
+  const d = here && hasPos(m) ? distKm(here, m) : null;
+  const isMine = current && current.id === m.id;
+  $("sheetTitle").textContent = m.name;
+  $("sheetBody").innerHTML = `
+    <div class="next">
+      <div class="lbl">${d !== null ? "على بعد " + fmtDist(d) + " · " : ""}الإقامة القادمة</div>
+      <div class="pr">${nextP.name}</div>
+      <div class="tm">${fmt12(nextP.iqama)}</div>
+      <div class="in">${arDuration(Math.max(0, Math.ceil((nextT - now) / 60000)))}</div>
+    </div>
+    <div id="mpList" style="background:var(--card);border-radius:18px;padding:4px 0">
+      ${list.map((p, i) => `<div class="row ${i === nextI ? "active" : ""}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`).join("")}
+      ${now.getDay() === 5 ? "" : `<div class="row"><span class="n">الجمعة</span><span class="t">${fmt12(m.jumuah)}</span></div>`}
+    </div>
+    ${hasPos(m) ? '<button class="updateBar" id="mpGo">🧭 الطريق إلى المسجد</button>' : ""}
+    ${isMine ? '<div class="form"><div class="msg">هذا مسجدك الحالي، وتنبيهاتك منه.</div></div>'
+             : '<button class="bigBtn" id="mpChoose">اجعله مسجدي (التنبيهات منه)</button>'}`;
+  if ($("mpGo")) $("mpGo").onclick = () => openDirections(m);
+  if ($("mpChoose")) $("mpChoose").onclick = () => chooseMosque({ mode: "fixed", id: m.id });
+}
 function openSheet() { sheetView = "list"; renderSheet(); $("sheet").hidden = false; history.pushState({ sheet: true }, ""); }
 function closeSheet() { $("sheet").hidden = true; }
 function chooseMosque(c) { choice = c; store.set("mosqueChoice", choice); applyMosque(); history.back(); }
