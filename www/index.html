@@ -787,6 +787,29 @@ async function nativeLevel() {
   if (!Updater) return 1;
   try { return parseInt(String((await Updater.current()).native).split(".")[0], 10) || 1; } catch { return 1; }
 }
+// آخر نسخة منشورة: أولاً من ملف latest.json (نفس عنوان قائمة المساجد، وهو الأثبت)، ثم من واجهة GitHub احتياطاً
+const LATEST_URL = "https://raw.githubusercontent.com/etsbinaa-dev/masjid-iqama/main/latest.json";
+async function fetchJson(url, tries = 2) {
+  let err;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    } catch (e) { err = e; await new Promise(r => setTimeout(r, 1500)); }
+  }
+  throw err;
+}
+async function latestRelease() {
+  try {
+    const j = await fetchJson(LATEST_URL);
+    if (j && j.version) return { version: +j.version, native: +j.native || 1, webUrl: j.web || null };
+  } catch {}
+  const rel = await fetchJson("https://api.github.com/repos/etsbinaa-dev/masjid-iqama/releases/latest");
+  const web = (rel.assets || []).map(a => ({ a, m: /^web-n(\d+)\.zip$/.exec(a.name) })).find(x => x.m);
+  return { version: parseInt(String(rel.tag_name || "").replace(/\D/g, ""), 10),
+           native: web ? parseInt(web.m[1], 10) : 99, webUrl: web ? web.a.browser_download_url : null };
+}
 // سطر صغير يبيّن حالة التحديث تحت رقم النسخة (ويساعد على معرفة سبب أي مشكلة)
 function otaStatus(t) { $("otaStatus").textContent = t; }
 async function checkUpdate() {
@@ -796,15 +819,13 @@ async function checkUpdate() {
     if (appVersion) $("version").textContent = `النسخة ${appVersion}`;
     if (!appVersion || !Alarm) return;            // لا تحديث خارج تطبيق الجوال
     step = "السؤال عن آخر نسخة";
-    const res = await fetch("https://api.github.com/repos/etsbinaa-dev/masjid-iqama/releases/latest", { cache: "no-store" });
-    if (!res.ok) throw new Error("GitHub " + res.status);
-    const rel = await res.json();
-    const latest = parseInt(String(rel.tag_name || "").replace(/\D/g, ""), 10);
+    const info = await latestRelease();
+    const latest = info.version;
     if (!(latest > appVersion)) { otaStatus("التطبيق محدّث"); return; }
-    const web = (rel.assets || []).map(a => ({ a, m: /^web-n(\d+)\.zip$/.exec(a.name) })).find(x => x.m);
+    const web = info.webUrl ? { url: info.webUrl, native: info.native } : null;
     step = "معرفة النظام الداخلي";
     const myNative = await nativeLevel();
-    if (Updater && web && parseInt(web.m[1], 10) <= myNative) {
+    if (Updater && web && web.native <= myNative) {
       const v = String(latest);
       step = "البحث عن تنزيل سابق";
       const bundles = ((await Updater.list()) || {}).bundles || [];
@@ -814,7 +835,7 @@ async function checkUpdate() {
       if (!bundle) {
         step = "تنزيل التحديث";
         otaStatus(`جارٍ تنزيل التحديث ${latest}…`);
-        bundle = await Updater.download({ url: web.a.browser_download_url, version: v });
+        bundle = await Updater.download({ url: web.url, version: v });
       }
       step = "تجهيز التحديث";
       await Updater.next({ id: bundle.id });   // يُطبَّق حين يُغلق التطبيق أو يُرسَل للخلفية

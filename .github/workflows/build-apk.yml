@@ -3,7 +3,7 @@ name: بناء التطبيق APK
 on:
   push:
     branches: [main]
-    paths-ignore: ["times.json", "mosques.json", "README.md", "signing/**"]
+    paths-ignore: ["times.json", "mosques.json", "latest.json", "README.md", "signing/**"]
   workflow_dispatch:
 
 permissions:
@@ -105,3 +105,17 @@ jobs:
             masjid-iqama.apk
             web-n*.zip
           make_latest: true
+
+      # ملف صغير بآخر نسخة يقرؤه التطبيق للتحديث التلقائي (من نفس عنوان قائمة المساجد)
+      - name: تحديث latest.json
+        if: steps.check.outputs.ok == 'true'
+        run: |
+          N=$(cat NATIVE_LEVEL); V=${{ github.run_number }}
+          R="https://github.com/${{ github.repository }}/releases/download/v$V"
+          echo "{\"version\": $V, \"native\": $N, \"web\": \"$R/web-n$N.zip\", \"apk\": \"$R/masjid-iqama.apk\"}" > latest.json
+          cat latest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest.json
+          git commit -m "آخر نسخة: $V" || exit 0
+          for i in 1 2 3; do git pull --rebase -q origin main && git push && break; sleep 5; done
