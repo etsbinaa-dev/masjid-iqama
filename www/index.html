@@ -272,7 +272,9 @@ function render() {
     <div class="tm">${fmt12(nx.prayer.iqama)}</div>
     <div class="in">${arDuration(mins)}</div>`;
   $("list").innerHTML = todayPrayers(now).map((p, i) => {
-    const cls = i === nx.index ? "active" : (nx.index === -1 || i < nx.index ? "past" : "");
+    // بعد العشاء: الإقامة القادمة هي فجر الغد، فنميّز الفجر بدل تبهيت كل الصلوات
+    const nextIdx = nx.index === -1 ? 0 : nx.index;
+    const cls = i === nextIdx ? "active" : (nx.index !== -1 && i < nx.index ? "past" : "");
     return `<div class="row ${cls}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
   }).join("");
 }
