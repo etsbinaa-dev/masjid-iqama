@@ -111,7 +111,7 @@
   .mrow .nm { font-size:1.1rem; }
   .mrow .sub { color:var(--muted); font-size:.8rem; margin-top:2px; }
   .mrow .tag { color:var(--accent); font-size:.75rem; border:1px solid var(--accent); border-radius:999px; padding:0 8px; margin-inline-start:6px; }
-  .mrow .edit { padding:6px 10px; font-size:.9rem; }
+  .mrow .edit { padding:6px 10px; font-size:.9rem; white-space:nowrap; }
   .bigBtn { width:100%; padding:12px; font-size:1.05rem; }
   .form label { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--card); border-radius:10px; padding:10px 14px; font-size:1.05rem; }
   .form input { font-size:1.05rem; padding:6px; border-radius:8px; border:none; background:var(--text); color:var(--bg); }
@@ -371,11 +371,13 @@ function renderNearest() {
     $("nearGo").textContent = "";
   }
 }
+// يفتح تطبيق خرائط Google بالطريق مشياً إلى المسجد
+function openDirections(m) {
+  window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}&travelmode=walking`;
+}
 $("nearBtn").onclick = () => {
   if (!nearest) { $("nearName").textContent = "جارٍ تحديد موقعك…"; locate(); return; }
-  const { lat, lng } = nearest.m;
-  // يفتح تطبيق خرائط Google بالطريق مشياً إلى المسجد
-  window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+  openDirections(nearest.m);
 };
 async function fetchGithubMosques() {
   const res = await fetch(MOSQUES_URL + "?t=" + Date.now(), { cache: "no-store" });
@@ -469,6 +471,7 @@ function renderSheet() {
           <div class="nm">${escapeHtml(m.name)}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}</div>
           <div class="sub">${d !== null ? fmtDist(d) + " · " : ""}${times(m)}</div>
         </div>
+        ${hasPos(m) ? `<button class="edit" data-go="${escapeHtml(m.id)}" aria-label="الطريق إلى ${escapeHtml(m.name)}">🧭 الطريق</button>` : ""}
         <button class="edit" data-edit="${escapeHtml(m.id)}">تعديل</button>
       </div>`).join("")}
     <button class="bigBtn" id="addHere">+ أضف هذا المسجد (موقعي الحالي)</button>
@@ -477,6 +480,7 @@ function renderSheet() {
 $("sheetBody").addEventListener("click", async e => {
   const t = e.target;
   if (t.dataset && t.dataset.edit) { e.stopPropagation(); return renderEdit(t.dataset.edit); }
+  if (t.dataset && t.dataset.go) { e.stopPropagation(); const m = allMosques().find(x => x.id === t.dataset.go); if (m) openDirections(m); return; }
   if (t.id === "addHere") {
     $("sheetMsg").textContent = "جارٍ تحديد موقعك…";
     try {
