@@ -3,7 +3,7 @@ name: بناء التطبيق APK
 on:
   push:
     branches: [main]
-    paths-ignore: ["times.json", "README.md", "signing/**"]
+    paths-ignore: ["times.json", "mosques.json", "README.md", "signing/**"]
   workflow_dispatch:
 
 permissions:
