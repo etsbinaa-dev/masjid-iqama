@@ -179,6 +179,9 @@
 <script>
 // قائمة المساجد على الإنترنت: تُعدَّل في المستودع فتصل لكل من ثبّت التطبيق
 const MOSQUES_URL = "https://raw.githubusercontent.com/etsbinaa-dev/masjid-iqama/main/mosques.json";
+// قاعدة بيانات المساجد (Supabase). المفتاح "publishable" عام بطبيعته، والحماية في صلاحيات الجداول (RLS).
+const SUPA_URL = "https://xarwvqfnhzwyemdnoucx.supabase.co";
+const SUPA_KEY = "sb_publishable_zxZR8cXEGgpC50WGIgr4gw_EgGWnyN-";
 const PRAYER_LABELS = ["الفجر", "الظهر", "العصر", "المغرب", "العشاء"];
 
 // قائمة احتياطية تُستعمل إن لم يتوفر الإنترنت عند أول فتح
@@ -327,12 +330,31 @@ function applyMosque(reschedule = true) {
   if (reschedule && lastSig !== null && sig !== lastSig) scheduleAll();
   lastSig = sig;
 }
+async function fetchGithubMosques() {
+  const res = await fetch(MOSQUES_URL + "?t=" + Date.now(), { cache: "no-store" });
+  if (!res.ok) throw new Error("github " + res.status);
+  return (await res.json()).mosques || [];
+}
+async function fetchSupabaseMosques() {
+  const res = await fetch(`${SUPA_URL}/rest/v1/mosques?select=id,name,lat,lng,note,prayers,jumuah,updated_at`,
+    { headers: { apikey: SUPA_KEY }, cache: "no-store" });
+  if (!res.ok) throw new Error("supabase " + res.status);
+  return await res.json();
+}
+// نجمع المصدرين: لكل مسجد نأخذ النسخة الأحدث تعديلاً (updated_at)
 async function refreshMosques() {
   try {
-    const res = await fetch(MOSQUES_URL + "?t=" + Date.now(), { cache: "no-store" });
-    if (!res.ok) return;
-    const data = await res.json();
-    const list = (data.mosques || []).filter(validMosque);
+    const results = await Promise.allSettled([fetchGithubMosques(), fetchSupabaseMosques()]);
+    const byId = new Map();
+    for (const r of results) {
+      if (r.status !== "fulfilled") continue;
+      for (const m of r.value) {
+        if (!validMosque(m)) continue;
+        const old = byId.get(m.id);
+        if (!old || Date.parse(m.updated_at || 0) >= Date.parse(old.updated_at || 0)) byId.set(m.id, m);
+      }
+    }
+    const list = [...byId.values()];
     if (!list.length) return;
     baseMosques = list; store.set("mosques", baseMosques);
     updatedAt = new Date().toISOString(); store.set("updatedAt", updatedAt);
@@ -354,6 +376,27 @@ async function locate() {
     store.set("lastPos", here);
     applyMosque();
   } catch {}
+}
+
+// ---------- مشاركة المساجد مع الجميع (اقتراح يراجعه صاحب التطبيق) ----------
+function deviceId() {
+  let id = store.get("deviceId", null);
+  if (!id) {
+    id = (crypto.randomUUID && crypto.randomUUID()) ||
+      "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
+    store.set("deviceId", id);
+  }
+  return id;
+}
+async function submitSuggestion(s) {
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/mosque_submissions`, {
+      method: "POST",
+      headers: { apikey: SUPA_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ ...s, device_id: deviceId() })
+    });
+    return res.ok;
+  } catch { return false; }
 }
 
 // ---------- شاشة المساجد ----------
@@ -413,13 +456,14 @@ function renderEdit(id, newPos) {
     <label>اسم المسجد ${isMine ? `<input type="text" id="fName" value="${m ? escapeHtml(m.name) : ""}" placeholder="مثلاً: مسجد النور">` : `<b>${escapeHtml(m.name)}</b>`}</label>
     ${prayers.map((p, i) => `<label>${PRAYER_LABELS[i]}<input type="time" id="fT${i}" value="${p.iqama}"></label>`).join("")}
     <label>الجمعة<input type="time" id="fJ" value="${jum}"></label>
+    <label>شارك مع الجميع (بعد المراجعة)<input type="checkbox" id="fShare" checked></label>
     <button class="bigBtn" id="fSave">حفظ</button>
     ${!isNew && m.edited ? '<button class="bigBtn" id="fReset">الرجوع للأوقات الأصلية</button>' : ""}
     ${!isNew && m.mine ? '<button class="bigBtn danger" id="fDelete">حذف هذا المسجد</button>' : ""}
-    <div class="msg" id="fMsg">${isMine ? "هذا المسجد محفوظ على جوالك فقط." : "التعديل يكون على جوالك فقط، ولا يتغيّر عند غيرك."}</div>
+    <div class="msg" id="fMsg">يُحفظ على جوالك مباشرة. وإن اخترت المشاركة، يُرسل اسم المسجد وموقعه وأوقاته فقط (دون أي معلومات عنك) ليُراجَع ثم يظهر للجميع.</div>
   </div>`;
   const pad = v => v.length === 4 ? "0" + v : v;
-  $("fSave").onclick = () => {
+  $("fSave").onclick = async () => {
     const vals = PRAYER_LABELS.map((_, i) => $("fT" + i).value);
     const j = $("fJ").value;
     const name = isMine ? $("fName").value.trim() : m.name;
@@ -436,7 +480,19 @@ function renderEdit(id, newPos) {
       store.set("overrides", overrides);
     }
     store.set("myMosques", myMosques);
+    let shareMsg = "";
+    if ($("fShare").checked) {
+      $("fSave").disabled = true; $("fMsg").textContent = "جارٍ الإرسال…";
+      const target = isNew ? myMosques[myMosques.length - 1] : (m.mine ? myMosques.find(x => x.id === m.id) : null);
+      const sub = target
+        ? { kind: "new", name, lat: target.lat, lng: target.lng, prayers: ps, jumuah: pad(j) }
+        : { kind: "times", mosque_id: m.id, name: m.name, prayers: ps, jumuah: pad(j) };
+      shareMsg = (await submitSuggestion(sub))
+        ? "شكراً، أُرسل للمراجعة وسيظهر للجميع بعد اعتماده."
+        : "حُفظ على جوالك، لكن تعذّر الإرسال للمراجعة (تحقق من الإنترنت وأعد الحفظ لاحقاً).";
+    }
     applyMosque(); sheetView = "list"; renderSheet();
+    if (shareMsg) $("sheetMsg").textContent = shareMsg;
   };
   if ($("fReset")) $("fReset").onclick = () => { delete overrides[m.id]; store.set("overrides", overrides); applyMosque(); sheetView = "list"; renderSheet(); };
   if ($("fDelete")) $("fDelete").onclick = () => {
