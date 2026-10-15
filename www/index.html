@@ -8,23 +8,32 @@
   /* خط أميري (رخصة OFL) مضمّن في التطبيق لنصوص القرآن والأذكار */
   @font-face { font-family:"Amiri"; font-weight:400; font-display:swap; src:url("fonts/amiri-400.woff2") format("woff2"); }
   @font-face { font-family:"Amiri"; font-weight:700; font-display:swap; src:url("fonts/amiri-700.woff2") format("woff2"); }
-  :root { --bg:#0f2a24; --card:#163a32; --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
+  :root { --bg:#0f2a24; --card:#163a32; --card2:#1d4a40; --line:rgba(212,168,75,.35); --hair:rgba(243,239,226,.08); --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
          padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
-  .wrap { max-width:520px; margin:0 auto; padding:10px 16px; }
-  h1 { text-align:center; margin:4px 0 0; font-size:1.3rem; }
-  .date { text-align:center; color:var(--muted); font-size:.85rem; }
-  .clock { text-align:center; font-size:1.9rem; font-weight:bold; letter-spacing:1px; margin:2px 0; }
-  .next { background:var(--accent); color:var(--on-accent); border-radius:12px; padding:8px 12px; text-align:center; margin:6px 0 8px; }
-  .next b { font-size:1.1rem; }
-  .countdown { font-size:1.6rem; font-weight:bold; }
-  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--card);
-         border-radius:10px; padding:9px 14px; margin:6px 0; font-size:1.1rem; }
-  .row.active { outline:2px solid var(--accent); }
-  .note { text-align:center; color:var(--muted); font-size:.85rem; margin-top:8px; white-space:pre-line; }
-  .clock, .countdown, .row span:last-child { font-variant-numeric:tabular-nums; }
-  .settings { background:var(--card); border-radius:10px; margin-top:8px; }
+  /* الشاشة الرئيسية: هادئة، بطاقة للإقامة القادمة، وقائمة واحدة للصلوات */
+  .wrap { max-width:520px; margin:0 auto; padding:14px 18px 18px; display:flex; flex-direction:column; gap:14px; }
+  .top { text-align:center; display:flex; flex-direction:column; gap:2px; }
+  h1 { margin:0; font-family:"Amiri",serif; font-size:1.7rem; font-weight:700; line-height:1.4; }
+  .where { color:var(--muted); font-size:.85rem; }
+  .date { color:var(--muted); font-size:.8rem; opacity:.85; }
+  .next { border-radius:20px; padding:18px 16px 16px; text-align:center;
+          background:linear-gradient(160deg, var(--card2), var(--card)); border:1px solid var(--line); }
+  .next .lbl { color:var(--muted); font-size:.85rem; }
+  .next .pr { font-family:"Amiri",serif; font-size:2.6rem; font-weight:700; color:var(--accent); line-height:1.3; }
+  .next .tm { font-size:1.7rem; font-weight:600; font-variant-numeric:tabular-nums; }
+  .next .in { color:var(--muted); font-size:.95rem; margin-top:4px; }
+  #list { background:var(--card); border-radius:18px; padding:4px 0; }
+  .row { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; font-size:1.1rem; }
+  .row + .row { border-top:1px solid var(--hair); }
+  .row .t { font-variant-numeric:tabular-nums; }
+  .row.past { opacity:.45; }
+  .row.active { color:var(--accent); font-weight:700; }
+  .row.active .n::before { content:"●"; font-size:.6em; margin-inline-end:8px; vertical-align:middle; }
+  .note { text-align:center; color:var(--muted); font-size:.8rem; white-space:pre-line; }
+  .note:empty { display:none; }
+  .settings { background:transparent; border-radius:14px; border:1px solid var(--hair); }
   .settings summary { padding:10px 14px; cursor:pointer; color:var(--accent); font-size:.95rem; }
   .settings .body { display:grid; gap:12px; padding:0 14px 14px; }
   .settings label { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:1rem; }
@@ -32,9 +41,11 @@
   input[type=checkbox] { width:24px; height:24px; accent-color:var(--accent); }
   button { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 12px; font-size:.95rem; }
   .status { color:var(--muted); font-size:.9rem; line-height:1.6; }
-  .updated { text-align:center; color:var(--muted); font-size:.75rem; margin-top:8px; }
-  .adhkarRow { display:flex; gap:8px; margin-top:8px; }
-  .adhkarRow .adhkarBtn { flex:1; margin-top:0; padding:11px 6px; }
+  .updated { text-align:center; color:var(--muted); font-size:.7rem; opacity:.7; }
+  .adhkarRow { display:flex; gap:10px; }
+  .adhkarRow .adhkarBtn { flex:1; margin-top:0; padding:10px 6px; border:none; border-radius:14px; display:flex; flex-direction:column; gap:0; line-height:1.3; }
+  .adhkarRow .adhkarBtn small { color:var(--muted); font-size:.75rem; }
+  .adhkarRow .adhkarBtn span { font-family:"Amiri",serif; font-size:1.25rem; font-weight:700; }
   .adhkarBtn { display:block; width:100%; margin-top:8px; padding:11px 14px; font-size:1.05rem; background:var(--card); color:var(--accent); border:1px solid var(--accent); border-radius:10px; }
   #adhkarView { position:fixed; inset:0; background:var(--bg); overflow:hidden; z-index:10; display:flex; flex-direction:column;
                 padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
@@ -75,8 +86,7 @@
   .dhikr .txt .lead { color:var(--accent); font-size:.82em; }
   .dhikr .txt .gap { height:.5em; }
   .dhikr .txt .an { color:var(--accent); }
-  .where { text-align:center; font-size:.85rem; color:var(--muted); margin-top:2px; }
-  .where button { background:none; border:none; color:var(--accent); font-size:.85rem; padding:2px 4px; text-decoration:underline; }
+  .where button { background:none; border:none; color:var(--accent); font-size:.85rem; padding:2px 4px; }
   #sheet { position:fixed; inset:0; background:var(--bg); z-index:11; display:flex; flex-direction:column;
            padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
   #sheet[hidden] { display:none; }
@@ -98,18 +108,19 @@
 </head>
 <body>
 <div class="wrap">
-  <h1 id="name"></h1>
-  <div class="where"><span id="whereText"></span> <button id="mosquesBtn">المساجد</button></div>
-  <div class="date" id="date"></div>
-  <div class="clock" id="clock"></div>
+  <div class="top">
+    <h1 id="name"></h1>
+    <div class="where"><span id="whereText"></span> <button id="mosquesBtn">تغيير المسجد ‹</button></div>
+    <div class="date" id="date"></div>
+  </div>
   <div class="next" id="next"></div>
   <div id="list"></div>
   <div class="note" id="note"></div>
 
   <div class="adhkarRow">
-    <button class="adhkarBtn" data-sec="morning">أذكار الصباح</button>
-    <button class="adhkarBtn" data-sec="evening">أذكار المساء</button>
-    <button class="adhkarBtn" data-sec="sleep">أذكار النوم</button>
+    <button class="adhkarBtn" data-sec="morning"><small>أذكار</small><span>الصباح</span></button>
+    <button class="adhkarBtn" data-sec="evening"><small>أذكار</small><span>المساء</span></button>
+    <button class="adhkarBtn" data-sec="sleep"><small>أذكار</small><span>النوم</span></button>
   </div>
   <details class="settings" id="settingsBox">
     <summary id="settingsSummary">⚙ إعدادات التنبيه</summary>
@@ -226,23 +237,33 @@ function findNext(now) {
   const first = todayPrayers(tomorrow)[0];
   return { index: -1, prayer: first, time: toDate(first.iqama, tomorrow) };
 }
+// المدة المتبقية بالعربية: "بعد ساعة و21 دقيقة"
+function arDuration(totalMin) {
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  const mins = m === 1 ? "دقيقة" : m === 2 ? "دقيقتين" : m <= 10 ? `${m} دقائق` : `${m} دقيقة`;
+  const hrs = h === 1 ? "ساعة" : h === 2 ? "ساعتين" : h <= 10 ? `${h} ساعات` : `${h} ساعة`;
+  if (h === 0) return m === 0 ? "الآن" : `بعد ${mins}`;
+  return m === 0 ? `بعد ${hrs}` : `بعد ${hrs} و${mins}`;
+}
 function render() {
   const now = new Date();
   $("name").textContent = cfg.mosqueName;
   $("note").textContent = cfg.note || "";
-  $("clock").textContent = now.toLocaleTimeString("ar-u-nu-latn", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const greg = now.toLocaleDateString("ar-u-nu-latn", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const greg = now.toLocaleDateString("ar-u-nu-latn", { weekday: "long", day: "numeric", month: "long" });
   let hijri = "";
   try { hijri = now.toLocaleDateString("ar-u-ca-islamic-umalqura-nu-latn", { day: "numeric", month: "long", year: "numeric" }); } catch {}
   $("date").textContent = hijri ? `${greg} · ${hijri}` : greg;
 
   const nx = findNext(now);
-  const diff = Math.max(0, Math.floor((nx.time - now) / 1000));
-  const h = Math.floor(diff / 3600), m = Math.floor(diff % 3600 / 60), s = diff % 60;
-  $("next").innerHTML = `الإقامة القادمة: <b>${nx.prayer.name}</b> (${fmt12(nx.prayer.iqama)})
-     <div class="countdown">${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}</div>`;
-  $("list").innerHTML = todayPrayers(now).map((p, i) =>
-    `<div class="row ${i === nx.index ? "active" : ""}"><span>${p.name}</span><span>${fmt12(p.iqama)}</span></div>`).join("");
+  const mins = Math.max(0, Math.ceil((nx.time - now) / 60000));
+  $("next").innerHTML = `<div class="lbl">الإقامة القادمة</div>
+    <div class="pr">${nx.prayer.name}</div>
+    <div class="tm">${fmt12(nx.prayer.iqama)}</div>
+    <div class="in">${arDuration(mins)}</div>`;
+  $("list").innerHTML = todayPrayers(now).map((p, i) => {
+    const cls = i === nx.index ? "active" : (nx.index === -1 || i < nx.index ? "past" : "");
+    return `<div class="row ${cls}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
+  }).join("");
 }
 
 // ---------- المساجد ----------
@@ -299,8 +320,8 @@ function applyMosque(reschedule = true) {
   cfg = { mosqueName: current.name, note: current.note || "", prayers: current.prayers, jumuah: current.jumuah };
   store.set("lastMosque", current.id);
   $("whereText").textContent =
-    currentWhy === "near" ? `📍 الأقرب إليك · ${fmtDist(currentDist)}` :
-    currentWhy === "fixed" ? "اخترته يدوياً" : "";
+    currentWhy === "near" ? `📍 الأقرب إليك · ${fmtDist(currentDist)} ·` :
+    currentWhy === "fixed" ? "اخترته يدوياً ·" : "";
   const sig = JSON.stringify(cfg);
   render();
   if (reschedule && lastSig !== null && sig !== lastSig) scheduleAll();
