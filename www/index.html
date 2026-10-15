@@ -31,7 +31,15 @@
   .row.past { opacity:.45; }
   .row.active { color:var(--accent); font-weight:700; }
   .row.active .n::before { content:"●"; font-size:.6em; margin-inline-end:8px; vertical-align:middle; }
-  .note { text-align:center; color:var(--muted); font-size:.8rem; white-space:pre-line; }
+  .nearBtn { display:flex; align-items:center; gap:12px; width:100%; background:var(--card); border:1px solid var(--hair);
+             border-radius:16px; padding:12px 16px; color:var(--text); text-align:start; }
+  .nearBtn:active { border-color:var(--accent); }
+  .nearBtn .ic { font-size:1.5rem; }
+  .nearBtn .tx { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .nearBtn small { color:var(--muted); font-size:.75rem; }
+  .nearBtn b { font-size:1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nearBtn .go { color:var(--accent); font-weight:700; white-space:nowrap; }
+  .note { color:var(--muted); font-size:.8rem; white-space:pre-line; }
   .note:empty { display:none; }
   .settings { background:transparent; border-radius:14px; border:1px solid var(--hair); }
   .settings summary { padding:10px 14px; cursor:pointer; color:var(--accent); font-size:.95rem; }
@@ -121,6 +129,11 @@
     <div class="date" id="date"></div>
   </div>
   <div class="next" id="next"></div>
+  <button class="nearBtn" id="nearBtn">
+    <span class="ic">🧭</span>
+    <span class="tx"><small>أقرب مسجد إليك الآن</small><b id="nearName">جارٍ تحديد موقعك…</b></span>
+    <span class="go" id="nearGo">الطريق ‹</span>
+  </button>
   <div id="list"></div>
   <div class="note" id="note"></div>
 
@@ -336,11 +349,34 @@ function applyMosque(reschedule = true) {
   $("whereText").textContent =
     currentWhy === "near" ? `📍 الأقرب إليك · ${fmtDist(currentDist)}` :
     currentWhy === "fixed" ? "اخترته يدوياً" : "اضغط على اسم المسجد لاختيار مسجدك";
+  renderNearest();
   const sig = JSON.stringify(cfg);
   render();
   if (reschedule && lastSig !== null && sig !== lastSig) scheduleAll();
   lastSig = sig;
 }
+// زر "أقرب مسجد إليك الآن": أقرب مسجد لموقع الجوال (حتى لو اخترت مسجدك يدوياً)، والضغط يفتح الطريق إليه في الخرائط
+let nearest = null;
+function renderNearest() {
+  nearest = null;
+  if (here) for (const m of allMosques()) if (hasPos(m)) {
+    const d = distKm(here, m);
+    if (!nearest || d < nearest.d) nearest = { m, d };
+  }
+  if (nearest) {
+    $("nearName").textContent = `${nearest.m.name} · ${fmtDist(nearest.d)}`;
+    $("nearGo").textContent = "الطريق ‹";
+  } else {
+    $("nearName").textContent = here ? "لا توجد مساجد بمواقع معروفة" : "اضغط لتحديد موقعك";
+    $("nearGo").textContent = "";
+  }
+}
+$("nearBtn").onclick = () => {
+  if (!nearest) { $("nearName").textContent = "جارٍ تحديد موقعك…"; locate(); return; }
+  const { lat, lng } = nearest.m;
+  // يفتح تطبيق خرائط Google بالطريق مشياً إلى المسجد
+  window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
+};
 async function fetchGithubMosques() {
   const res = await fetch(MOSQUES_URL + "?t=" + Date.now(), { cache: "no-store" });
   if (!res.ok) throw new Error("github " + res.status);
@@ -386,7 +422,9 @@ async function locate() {
     here = await getPosition();
     store.set("lastPos", here);
     applyMosque();
-  } catch {}
+  } catch {
+    if (!here) $("nearName").textContent = "فعّل الموقع (GPS) ثم اضغط هنا";
+  }
 }
 
 // ---------- مشاركة المساجد مع الجميع (اقتراح يراجعه صاحب التطبيق) ----------
