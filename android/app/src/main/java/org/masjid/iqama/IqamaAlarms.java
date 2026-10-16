@@ -21,14 +21,44 @@ public final class IqamaAlarms {
     static final String EXTRA_ALARM = "alarm";
     private static final String PREFS = "iqama_alarms";
     private static final String KEY = "alarms";
+    // لكل مسجد له موقع: تنبيهاته الجاهزة {lat, lng, alarms}، لاختيار الأقرب قبل كل صلاة بساعة
+    private static final String KEY_VARIANTS = "variants";
 
     private IqamaAlarms() {}
 
     /** يلغي التنبيهات السابقة ويحفظ القائمة الجديدة ويجدولها. */
-    static void replaceAll(Context c, JSONArray alarms) {
+    static void replaceAll(Context c, JSONArray alarms, JSONArray variants) {
         cancelAll(c);
-        prefs(c).edit().putString(KEY, alarms.toString()).apply();
+        prefs(c).edit()
+            .putString(KEY, alarms.toString())
+            .putString(KEY_VARIANTS, variants == null ? "[]" : variants.toString())
+            .apply();
         scheduleAll(c);
+    }
+
+    /** يستبدل تنبيهاً واحداً (بنفس الرقم) ويجدوله؛ يُستعمل بعد اختيار أقرب مسجد. */
+    static void updateOne(Context c, JSONObject item) {
+        JSONArray alarms = load(c);
+        for (int i = 0; i < alarms.length(); i++) {
+            JSONObject a = alarms.optJSONObject(i);
+            if (a != null && a.optInt("id") == item.optInt("id")) {
+                try {
+                    alarms.put(i, item);
+                } catch (Exception ignored) {
+                }
+                prefs(c).edit().putString(KEY, alarms.toString()).apply();
+                scheduleNext(c, item);
+                return;
+            }
+        }
+    }
+
+    static JSONArray loadVariants(Context c) {
+        try {
+            return new JSONArray(prefs(c).getString(KEY_VARIANTS, "[]"));
+        } catch (Exception e) {
+            return new JSONArray();
+        }
     }
 
     static void scheduleAll(Context c) {
@@ -46,7 +76,7 @@ public final class IqamaAlarms {
             JSONObject a = alarms.optJSONObject(i);
             if (a != null && am != null) am.cancel(pendingIntent(c, a));
         }
-        prefs(c).edit().remove(KEY).apply();
+        prefs(c).edit().remove(KEY).remove(KEY_VARIANTS).apply();
     }
 
     /** يجدول الموعد القادم لتنبيه متكرر. */

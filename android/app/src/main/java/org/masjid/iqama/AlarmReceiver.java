@@ -55,6 +55,11 @@ public class AlarmReceiver extends BroadcastReceiver {
         long now = System.currentTimeMillis();
         // الموعد القادم بعد دقيقة على الأقل، حتى لو وصل التنبيه قبل وقته بلحظة
         if (a.optBoolean("repeat", true)) IqamaAlarms.scheduleNext(c, a, now + 60_000L);
+        // فحص الموقع قبل الصلاة بساعة: لا صوت ولا إشعار، فقط اختيار أقرب مسجد
+        if (a.optBoolean("check", false)) {
+            LocationCheck.run(c, a.optInt("slot"), goAsync());
+            return;
+        }
         // حماية: لا يرنّ نفس التنبيه مرتين خلال دقيقة
         synchronized (lastFired) {
             Long last = lastFired.get(a.optInt("id"));
