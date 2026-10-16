@@ -25,13 +25,15 @@
   .bgLoc { display:block; margin:8px auto 0; padding:8px 12px; font-size:.85rem; line-height:1.6; border-radius:10px;
            background:transparent; color:var(--accent); border:1px dashed var(--accent); }
   .bgLoc[hidden] { display:none; }
+  .whereGo { padding:0 6px; border:none; font-size:.85rem; font-weight:700; }
+  .whereGo[hidden], .nearBtn[hidden] { display:none; }
   .date { color:var(--muted); font-size:.8rem; opacity:.85; }
-  .next { border-radius:20px; padding:18px 16px 16px; text-align:center;
+  .next { border-radius:20px; padding:10px 16px 10px; text-align:center;
           background:linear-gradient(160deg, var(--card2), var(--card)); border:1px solid var(--line); }
   .next .lbl { color:var(--muted); font-size:.85rem; }
-  .next .pr { font-family:"Amiri",serif; font-size:2.6rem; font-weight:700; color:var(--accent); line-height:1.3; }
-  .next .tm { font-size:1.7rem; font-weight:600; font-variant-numeric:tabular-nums; }
-  .next .in { color:var(--muted); font-size:.95rem; margin-top:4px; }
+  .next .pr { font-family:"Amiri",serif; font-size:2.2rem; font-weight:700; color:var(--accent); line-height:1.2; }
+  .next .tm { font-size:1.5rem; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.3; }
+  .next .in { color:var(--muted); font-size:.9rem; margin-top:2px; }
   #list { background:var(--card); border-radius:18px; padding:4px 0; }
   .row { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; font-size:1.1rem; }
   .row + .row { border-top:1px solid var(--hair); }
@@ -58,7 +60,7 @@
   button { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 12px; font-size:.95rem; }
   .status { color:var(--muted); font-size:.9rem; line-height:1.6; }
   .updated { text-align:center; color:var(--muted); font-size:.7rem; opacity:.7; }
-  .adhkarRow { display:flex; gap:10px; }
+  .adhkarRow { display:flex; gap:8px; }
   .adhkarRow .adhkarBtn { flex:1; margin-top:0; padding:10px 6px; border:none; border-radius:14px; display:flex; flex-direction:column; gap:0; line-height:1.3; }
   .adhkarRow .adhkarBtn small { color:var(--muted); font-size:.75rem; }
   .adhkarRow .adhkarBtn span { font-family:"Amiri",serif; font-size:1.25rem; font-weight:700; }
@@ -111,7 +113,7 @@
   .kahfCard { flex:1; min-height:0; background:var(--card); border-radius:14px; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
   #kahfText { flex:1; min-height:0; overflow-y:auto; font-family:"Warsh",serif; font-size:26px; line-height:2.1; text-align:center; }
   #kahfText .basmala { color:var(--accent); margin-bottom:.3em; }
-  .kahfBtn { margin-top:10px; }
+
   .mosqueSwitch { align-self:center; display:flex; align-items:center; gap:8px; background:none; border:none; color:var(--text);
                   padding:2px 14px; border-radius:999px; }
   .mosqueSwitch:active { background:var(--card); }
@@ -150,7 +152,7 @@
   <button class="updateBar" id="updateBar" hidden></button>
   <div class="top">
     <button class="mosqueSwitch" id="mosquesBtn" aria-label="تغيير المسجد"><h1 id="name"></h1><span class="chev">⌄</span></button>
-    <div class="where"><span id="whereText"></span></div>
+    <div class="where"><span id="whereText"></span><button class="whereGo" id="whereGo" hidden>· 🧭 الطريق</button></div>
     <button class="bgLoc" id="bgLocBtn" hidden>📍 ليتغيّر المسجد تلقائياً وأنت خارج التطبيق: اسمح بالموقع «طوال الوقت»</button>
     <div class="date" id="date"></div>
   </div>
@@ -168,8 +170,8 @@
     <button class="adhkarBtn" data-sec="morning"><small>أذكار</small><span>الصباح</span></button>
     <button class="adhkarBtn" data-sec="evening"><small>أذكار</small><span>المساء</span></button>
     <button class="adhkarBtn" data-sec="sleep"><small>أذكار</small><span>النوم</span></button>
+    <button class="adhkarBtn" id="kahfOpen"><small>سورة</small><span>الكهف</span></button>
   </div>
-  <button class="adhkarBtn kahfBtn" id="kahfOpen">📖 سورة الكهف · رواية ورش</button>
   <details class="settings" id="settingsBox">
     <summary id="settingsSummary">⚙ الإعدادات</summary>
     <div class="body">
@@ -216,11 +218,11 @@
     </label>
     <div class="status" id="notifyStatus"></div>
     <button id="exactBtn" hidden>اسمح بالتنبيه في الوقت الدقيق</button>
+    <div class="updated" id="updated"></div>
+    <div class="updated" id="version"></div>
+    <div class="updated" id="otaStatus"></div>
     </div>
   </details>
-  <div class="updated" id="updated"></div>
-  <div class="updated" id="version"></div>
-  <div class="updated" id="otaStatus"></div>
 </div>
 
 <div id="sheet" hidden>
@@ -464,6 +466,9 @@ function renderNearest() {
     const d = distKm(here, m);
     if (!nearest || d < nearest.d) nearest = { m, d };
   }
+  // إن كان الأقرب هو المسجد المعروض فلا داعي لتكرار اسمه؛ الطريق إليه بجانب سطر المسجد
+  $("nearBtn").hidden = !!(nearest && current && nearest.m.id === current.id);
+  $("whereGo").hidden = !(current && hasPos(current));
   if (nearest) {
     $("nearName").textContent = `${nearest.m.name} · ${fmtDist(nearest.d)}`;
     $("nearGo").textContent = "الطريق ‹";
@@ -485,6 +490,7 @@ function shareMosque(m) {
 function openDirections(m) {
   window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}&travelmode=walking`;
 }
+$("whereGo").onclick = () => { if (current && hasPos(current)) openDirections(current); };
 $("nearBtn").onclick = () => {
   if (!nearest) { $("nearName").textContent = "جارٍ تحديد موقعك…"; locate(); return; }
   openMosquePage(nearest.m.id);
