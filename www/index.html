@@ -113,6 +113,7 @@
   .kahfCard { flex:1; min-height:0; background:var(--card); border-radius:14px; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
   #kahfText { flex:1; min-height:0; overflow-y:auto; font-family:"Warsh",serif; font-size:26px; line-height:2.1; text-align:center; }
   #kahfText .basmala { color:var(--accent); margin-bottom:.3em; }
+  #kahfText .end { color:var(--accent); margin:.6em 0 .4em; font-size:.8em; }
 
   .mosqueSwitch { align-self:center; display:flex; align-items:center; gap:8px; background:none; border:none; color:var(--text);
                   padding:2px 14px; border-radius:999px; }
@@ -270,10 +271,6 @@
         <div class="zoom"><button id="kZoomOut" aria-label="تصغير الخط">−</button><button id="kZoomIn" aria-label="تكبير الخط">+</button></div>
       </div>
       <div id="kahfText"></div>
-    </div>
-    <div class="nav">
-      <button id="kahfPrev">السابق</button>
-      <button id="kahfNext">التالي</button>
     </div>
   </div>
 </div>
@@ -1022,52 +1019,53 @@ $("adhkarBack").onclick = () => history.back();
 window.addEventListener("popstate", () => { closeAdhkar(); closeSheet(); closeKahf(); });
 
 // ---------- سورة الكهف (رواية ورش عن نافع، نص وخط مجمع الملك فهد) ----------
-// صفحة بصفحة كما في مصحف ورش (293–304)، ويُحفظ آخر موضع
-let kahf = null, kPage = 0;
+// السورة كاملة في صفحة واحدة تُمرَّر، ويُحفظ موضع القراءة
+let kahf = null;
 const BASMALA_WARSH = "بِسْمِ اِ۬للَّهِ اِ۬لرَّحْمَٰنِ اِ۬لرَّحِيمِ";
 if (!settings.quranPx) settings.quranPx = 26;
 function renderKahf() {
-  const pg = kahf.pages[kPage], el = $("kahfText");
-  $("kahfPage").textContent = `صفحة ${pg.page} · ${kPage + 1} من ${kahf.pages.length}`;
-  el.innerHTML = (kPage === 0 ? `<div class="basmala">${BASMALA_WARSH}</div>` : "") + pg.ayat.map(escapeHtml).join(" ");
+  const el = $("kahfText");
+  const ayat = kahf.pages.flatMap(pg => pg.ayat);
+  $("kahfPage").textContent = `${ayat.length} آية`;
+  el.innerHTML = `<div class="basmala">${BASMALA_WARSH}</div>` + ayat.map(escapeHtml).join(" ") +
+    `<div class="end">صدق الله العظيم</div>`;
   el.style.fontSize = settings.quranPx + "px";
-  el.scrollTop = 0;
-  $("kahfPrev").disabled = kPage === 0;
-  $("kahfNext").disabled = kPage === kahf.pages.length - 1;
-  $("kahfNext").textContent = kPage === kahf.pages.length - 1 ? "صدق الله العظيم" : "التالي";
   $("kZoomOut").style.opacity = settings.quranPx <= ZOOM_MIN ? .35 : 1;
   $("kZoomIn").style.opacity = settings.quranPx >= ZOOM_MAX ? .35 : 1;
 }
-function kahfGo(i) {
-  if (!kahf || i < 0 || i >= kahf.pages.length) return;
-  kPage = i; store.set("kahfPage", kPage); renderKahf();
-}
+// الموضع نسبةً من طول السورة، حتى يبقى صحيحاً بعد تغيير حجم الخط
+function kahfPos() { const el = $("kahfText"); return el.scrollHeight > el.clientHeight ? el.scrollTop / (el.scrollHeight - el.clientHeight) : 0; }
+function kahfSetPos(r) { const el = $("kahfText"); el.scrollTop = r * (el.scrollHeight - el.clientHeight); }
 async function openKahf() {
   if (!kahf) { try { kahf = await (await fetch("kahf.json")).json(); } catch { return; } }
   closeAdhkar();
-  kPage = Math.min(store.get("kahfPage", 0) || 0, kahf.pages.length - 1);
   $("kahfView").hidden = false;
   renderKahf();
+  try { await document.fonts.load('26px "Warsh"'); } catch {}
+  kahfSetPos(store.get("kahfPos", 0) || 0);
   history.pushState({ kahf: true }, "");
 }
-function closeKahf() { $("kahfView").hidden = true; }
-function kZoom(step) {
-  settings.quranPx = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, settings.quranPx + step));
-  store.set("settings", settings); renderKahf();
+function closeKahf() {
+  if ($("kahfView").hidden) return;
+  clearTimeout(kSaveTimer); store.set("kahfPos", kahfPos());
+  $("kahfView").hidden = true;
 }
+function kZoom(step) {
+  const r = kahfPos();
+  settings.quranPx = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, settings.quranPx + step));
+  store.set("settings", settings); renderKahf(); kahfSetPos(r);
+}
+let kSaveTimer = null;
+$("kahfText").addEventListener("scroll", () => {
+  if ($("kahfView").hidden) return;   // الإخفاء يعيد التمرير إلى الصفر فلا نحفظه
+  const r = kahfPos();
+  clearTimeout(kSaveTimer);
+  kSaveTimer = setTimeout(() => store.set("kahfPos", r), 300);
+}, { passive: true });
 $("kahfOpen").onclick = openKahf;
 $("kahfBack").onclick = () => history.back();
-$("kahfNext").onclick = () => kahfGo(kPage + 1);
-$("kahfPrev").onclick = () => kahfGo(kPage - 1);
 $("kZoomIn").onclick = () => kZoom(2);
 $("kZoomOut").onclick = () => kZoom(-2);
-let kTouchX = null;
-$("kahfCard").addEventListener("touchstart", e => { kTouchX = e.touches[0].clientX; }, { passive: true });
-$("kahfCard").addEventListener("touchend", e => {
-  if (kTouchX === null) return;
-  const dx = e.changedTouches[0].clientX - kTouchX; kTouchX = null;
-  if (Math.abs(dx) > 60) kahfGo(kPage + (dx > 0 ? 1 : -1));
-});
 $("adhkarReset").onclick = () => { done = {}; saveDone(); goTo(0); };
 
 // ---------- رقم النسخة والتحديث ----------
