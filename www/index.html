@@ -131,9 +131,15 @@
   .mrow .info { flex:1; min-width:0; }
   .mrow .nm { font-size:1.1rem; }
   .mrow .sub { color:var(--muted); font-size:.8rem; margin-top:2px; }
-  .mrow .tag { color:var(--accent); font-size:.75rem; border:1px solid var(--accent); border-radius:999px; padding:0 8px; margin-inline-start:6px; }
+  .mrow .tag { display:inline-block; color:var(--accent); font-size:.75rem; border:1px solid var(--accent); border-radius:999px; padding:0 8px; margin-inline-start:6px; }
   .mrow .edit { padding:6px 10px; font-size:.9rem; white-space:nowrap; }
   .bigBtn { width:100%; padding:12px; font-size:1.05rem; }
+  .mrow .fav { border:none; padding:4px; font-size:1.35rem; line-height:1; color:var(--muted); }
+  .mrow .fav.on { color:var(--accent); }
+  .mSearch { width:100%; box-sizing:border-box; padding:10px 14px; font-size:1rem; border-radius:12px; border:1px solid var(--hair);
+             background:var(--card); color:var(--text); font-family:inherit; }
+  .mSection { color:var(--muted); font-size:.8rem; margin:4px 4px -4px; }
+  .mEmpty { color:var(--muted); font-size:.9rem; text-align:center; padding:8px; }
   .form label { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--card); border-radius:10px; padding:10px 14px; font-size:1.05rem; }
   .form input { font-size:1.05rem; padding:6px; border-radius:8px; border:none; background:var(--text); color:var(--bg); }
   .form input[type=text] { width:60%; }
@@ -603,32 +609,75 @@ function renderMosquePage(id) {
 function openSheet() { sheetView = "list"; renderSheet(); $("sheet").hidden = false; history.pushState({ sheet: true }, ""); }
 function closeSheet() { $("sheet").hidden = true; }
 function chooseMosque(c) { choice = c; store.set("mosqueChoice", choice); applyMosque(); history.back(); }
+// قائمة المساجد: المفضلة ⭐ أولاً، ثم أقرب 5 مساجد، و"عرض كل المساجد" للباقي، وخانة بحث بالاسم
+let favs = store.get("favMosques", []);
+let showAllMosques = false;
+const NEAR_COUNT = 5;
+// للبحث: نحذف التشكيل ونوحّد الألف والتاء المربوطة والياء
+function normAr(t) {
+  return String(t || "").replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .replace(/[أإآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").toLowerCase().trim();
+}
 function renderSheet() {
   const body = $("sheetBody");
   $("sheetTitle").textContent = "المساجد";
   $("sheetBack").textContent = "🏠 الرئيسية";
-  const list = allMosques().map(m => ({ m, d: here && hasPos(m) ? distKm(here, m) : null }))
-    .sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
-  const times = m => m.prayers.map(p => fmt12(p.iqama)).join(" · ");
+  showAllMosques = false;
   body.innerHTML = `
     <div class="mrow ${choice.mode === "auto" ? "sel" : ""}" data-auto="1">
       <div class="info"><div class="nm">📍 تلقائي: الأقرب إليّ</div>
       <div class="sub">يختار التطبيق أقرب مسجد كلما فتحته</div></div></div>
-    ${list.map(({ m, d }) => `
-      <div class="mrow ${choice.mode === "fixed" && choice.id === m.id ? "sel" : ""}" data-id="${escapeHtml(m.id)}">
+    <input class="mSearch" id="mSearch" type="search" placeholder="🔍 ابحث عن مسجد بالاسم" autocomplete="off">
+    <div id="mList" style="display:flex;flex-direction:column;gap:10px"></div>
+    <button class="bigBtn" id="addHere">+ أضف هذا المسجد (موقعي الحالي)</button>
+    <div class="form"><div class="msg" id="sheetMsg"></div></div>`;
+  $("mSearch").addEventListener("input", renderMosqueList);
+  renderMosqueList();
+}
+function renderMosqueList() {
+  const q = normAr($("mSearch") ? $("mSearch").value : "");
+  const all = allMosques().map(m => ({ m, d: here && hasPos(m) ? distKm(here, m) : null }))
+    .sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
+  const times = m => m.prayers.map(p => fmt12(p.iqama)).join(" · ");
+  const isSel = m => choice.mode === "fixed" && choice.id === m.id;
+  const row = ({ m, d }) => `
+      <div class="mrow ${isSel(m) ? "sel" : ""}" data-id="${escapeHtml(m.id)}">
+        <button class="fav ${favs.includes(m.id) ? "on" : ""}" data-fav="${escapeHtml(m.id)}" aria-label="مفضّل">${favs.includes(m.id) ? "★" : "☆"}</button>
         <div class="info">
           <div class="nm">${escapeHtml(m.name)}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}</div>
           <div class="sub">${d !== null ? fmtDist(d) + " · " : ""}${times(m)}</div>
         </div>
         ${hasPos(m) ? `<button class="edit" data-go="${escapeHtml(m.id)}" aria-label="الطريق إلى ${escapeHtml(m.name)}">🧭 الطريق</button>` : ""}
         <button class="edit" data-edit="${escapeHtml(m.id)}">تعديل</button>
-      </div>`).join("")}
-    <button class="bigBtn" id="addHere">+ أضف هذا المسجد (موقعي الحالي)</button>
-    <div class="form"><div class="msg" id="sheetMsg"></div></div>`;
+      </div>`;
+  let html = "";
+  if (q) {
+    const found = all.filter(x => normAr(x.m.name).includes(q));
+    html = found.length ? found.map(row).join("") : '<div class="mEmpty">لا يوجد مسجد بهذا الاسم</div>';
+  } else {
+    const fav = all.filter(x => favs.includes(x.m.id));
+    const rest = all.filter(x => !favs.includes(x.m.id));
+    // المسجد المختار يدوياً يبقى ظاهراً دائماً
+    const shown = showAllMosques ? rest : rest.filter((x, i) => i < NEAR_COUNT || isSel(x.m));
+    if (fav.length) html += '<div class="mSection">⭐ المفضلة</div>' + fav.map(row).join("");
+    if (shown.length) html += `<div class="mSection">${showAllMosques ? "كل المساجد" : "الأقرب إليك"}</div>` + shown.map(row).join("");
+    const hidden = rest.length - shown.length;
+    if (hidden > 0) html += `<button class="bigBtn" id="showAllM">عرض كل المساجد (${rest.length})</button>`;
+  }
+  $("mList").innerHTML = html;
 }
 $("sheetBody").addEventListener("click", async e => {
   const t = e.target;
   if (t.dataset && t.dataset.edit) { e.stopPropagation(); return renderEdit(t.dataset.edit); }
+  if (t.dataset && t.dataset.fav) {
+    e.stopPropagation();
+    const id = t.dataset.fav;
+    favs = favs.includes(id) ? favs.filter(x => x !== id) : [...favs, id];
+    store.set("favMosques", favs);
+    return renderMosqueList();
+  }
+  if (t.id === "showAllM") { showAllMosques = true; return renderMosqueList(); }
+  if (t.id === "mSearch") return;
   if (t.dataset && t.dataset.go) { e.stopPropagation(); const m = allMosques().find(x => x.id === t.dataset.go); if (m) openDirections(m); return; }
   if (t.id === "addHere") {
     $("sheetMsg").textContent = "جارٍ تحديد موقعك…";
