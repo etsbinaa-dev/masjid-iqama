@@ -1213,7 +1213,13 @@ scheduleAll();
 refreshMosques();
 locate();
 checkUpdate();
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshMosques(); locate(); refreshBgLoc(); } });
+// عند الرجوع إلى التطبيق (دون إغلاقه) نبحث أيضاً عن تحديث، مرة كل 10 دقائق على الأكثر
+let lastUpdateCheck = Date.now();
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  refreshMosques(); locate(); refreshBgLoc();
+  if (Date.now() - lastUpdateCheck > 10 * 60 * 1000) { lastUpdateCheck = Date.now(); checkUpdate(); }
+});
 </script>
 </body>
 </html>
