@@ -9,6 +9,9 @@
   @font-face { font-family:"Amiri"; font-weight:400; font-display:swap; src:url("fonts/amiri-400.woff2") format("woff2"); }
   @font-face { font-family:"Amiri"; font-weight:700; font-display:swap; src:url("fonts/amiri-700.woff2") format("woff2"); }
   :root { --bg:#0f2a24; --card:#163a32; --card2:#1d4a40; --line:rgba(212,168,75,.35); --hair:rgba(243,239,226,.08); --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
+  /* الوضع الفاتح (اختياري من الإعدادات): نفس الهوية، بأرضية فاتحة وذهبي أغمق ليبقى مقروءاً */
+  :root[data-theme="light"] { --bg:#f4f2ec; --card:#ffffff; --card2:#e9f1ec; --line:rgba(150,108,24,.45); --hair:rgba(15,42,36,.10);
+    --text:#14302a; --muted:#5b6d66; --accent:#9a6f17; --on-accent:#ffffff; color-scheme:light; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
          padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
@@ -118,6 +121,8 @@
   .form input[type=text] { width:60%; }
   .form .msg { color:var(--muted); font-size:.9rem; text-align:center; }
   .danger { color:#e08a7a; border-color:#e08a7a; }
+  :root[data-theme="light"] select, :root[data-theme="light"] .form input { background:#edf1ec; color:var(--text); border:1px solid var(--hair); }
+  :root[data-theme="light"] .danger { color:#b3442f; border-color:#b3442f; }
   .prRows { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .prRows label { background:var(--bg); border-radius:10px; padding:6px 10px; }
   .prRows select { font-size:.9rem; padding:4px; }
@@ -165,6 +170,31 @@
         <option value="-1">ناقص يوم</option>
         <option value="0">كما هو</option>
         <option value="1">زائد يوم</option>
+      </select>
+    </label>
+    <label for="soundSel">صوت التنبيه
+      <select id="soundSel">
+        <option value="hayya">حي على الصلاة</option>
+        <option value="chime">جرس هادئ</option>
+        <option value="vibrate">اهتزاز فقط</option>
+      </select>
+    </label>
+    <label for="fridayRemind">تذكير الجمعة (الكهف والصلاة على النبي ﷺ)
+      <input type="checkbox" id="fridayRemind">
+    </label>
+    <label for="fontSel">حجم الخط
+      <select id="fontSel">
+        <option value="15">صغير</option>
+        <option value="16">عادي</option>
+        <option value="18">كبير</option>
+        <option value="20">كبير جداً</option>
+      </select>
+    </label>
+    <label for="themeSel">المظهر
+      <select id="themeSel">
+        <option value="dark">داكن</option>
+        <option value="light">فاتح</option>
+        <option value="auto">حسب الجوال</option>
       </select>
     </label>
     <div class="status" id="notifyStatus"></div>
@@ -244,6 +274,19 @@ settings.prayers = Object.assign(Object.fromEntries(PRAYER_KEYS.map(k => [k, tru
 settings.perMin = Object.assign(Object.fromEntries(PRAYER_KEYS.map(k => [k, settings.minutes || 10])), settings.perMin || {});
 if (settings.adhkarRemind === undefined) settings.adhkarRemind = true;
 if (settings.hijriAdj === undefined) settings.hijriAdj = 0;
+if (!settings.sound) settings.sound = "hayya";
+if (settings.fridayRemind === undefined) settings.fridayRemind = true;
+if (!settings.fontPx) settings.fontPx = 16;
+if (!settings.theme) settings.theme = "dark";
+// حجم الخط والمظهر يُطبَّقان فوراً قبل أول رسم
+function applyLook() {
+  document.documentElement.style.fontSize = settings.fontPx + "px";
+  const sysLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+  const light = settings.theme === "light" || (settings.theme === "auto" && sysLight);
+  document.documentElement.dataset.theme = light ? "light" : "dark";
+}
+applyLook();
+try { window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyLook); } catch {}
 let updatedAt = store.get("updatedAt", null);
 
 const Notif = window.Capacitor && window.Capacitor.isNativePlatform()
@@ -655,6 +698,7 @@ function buildAlarms() {
     const at = minus(iqama, n);
     items.push({
       id, hour: at.hour, minute: at.minute, weekday: weekday || 0,
+      sound: settings.sound,
       title: `إقامة ${name} بعد ${minsWord(n)}`,
       body: `${cfg.mosqueName} — الإقامة ${fmt12(iqama)}`
     });
@@ -689,7 +733,14 @@ async function cleanupOld() {
 // تذكير الأذكار: بعد إقامة الفجر (الصباح) والعصر (المساء) بنصف ساعة
 async function scheduleAdhkarReminders() {
   if (!Notif) return;
-  try { await Notif.cancel({ notifications: [{ id: 901 }, { id: 902 }] }); } catch {}
+  try { await Notif.cancel({ notifications: [{ id: 901 }, { id: 902 }, { id: 903 }] }); } catch {}
+  if (settings.fridayRemind) {
+    try { await Notif.createChannel({ id: "adhkar", name: "تذكير الأذكار", importance: 3, visibility: 1 }); } catch {}
+    // الجمعة (6) الساعة 9 صباحاً
+    await Notif.schedule({ notifications: [{ id: 903, channelId: "adhkar", title: "يوم الجمعة",
+      body: "لا تنسَ قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ", smallIcon: "ic_stat_iqama",
+      schedule: { on: { weekday: 6, hour: 9, minute: 0 }, allowWhileIdle: true } }] });
+  }
   if (!settings.adhkarRemind) return;
   try { await Notif.createChannel({ id: "adhkar", name: "تذكير الأذكار", importance: 3, visibility: 1 }); } catch {}
   const at = (hhmm) => minus(hhmm, -30);
@@ -757,6 +808,14 @@ $("notifyOn").checked = settings.on;
 $("notifyOn").onchange = e => { settings.on = e.target.checked; store.set("settings", settings); scheduleAll(); };
 $("adhkarRemind").checked = settings.adhkarRemind;
 $("adhkarRemind").onchange = e => { settings.adhkarRemind = e.target.checked; store.set("settings", settings); scheduleAdhkarReminders(); };
+$("soundSel").value = settings.sound;
+$("soundSel").onchange = e => { settings.sound = e.target.value; store.set("settings", settings); scheduleAll(); };
+$("fridayRemind").checked = settings.fridayRemind;
+$("fridayRemind").onchange = e => { settings.fridayRemind = e.target.checked; store.set("settings", settings); scheduleAdhkarReminders(); };
+$("fontSel").value = String(settings.fontPx);
+$("fontSel").onchange = e => { settings.fontPx = Number(e.target.value); store.set("settings", settings); applyLook(); };
+$("themeSel").value = settings.theme;
+$("themeSel").onchange = e => { settings.theme = e.target.value; store.set("settings", settings); applyLook(); };
 $("hijriAdj").value = String(settings.hijriAdj);
 $("hijriAdj").onchange = e => { settings.hijriAdj = Number(e.target.value); store.set("settings", settings); render(); };
 // الضغط على تذكير الأذكار يفتح القسم المناسب
@@ -817,10 +876,11 @@ function fitText() {
   const el = $("dhikrText");
   if ($("adhkarView").hidden) return;
   const fits = () => el.scrollHeight <= el.clientHeight + 1;
-  let size = 40, lh = 2;
+  const f = (settings.fontPx || 16) / 16;
+  let size = Math.round(40 * f), lh = 2;
   const apply = () => { el.style.fontSize = size + "px"; el.style.lineHeight = lh; };
   apply();
-  while (!fits() && size > 11) {
+  while (!fits() && size > Math.round(11 * f)) {
     size -= 1;
     if (size < 20 && lh > 1.5) lh = Math.round((lh - 0.1) * 10) / 10;
     apply();
