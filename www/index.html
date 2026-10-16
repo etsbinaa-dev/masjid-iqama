@@ -870,6 +870,7 @@ function renderEdit(id, newPos) {
     <button class="bigBtn" id="fSave">حفظ</button>
     ${!isNew && m.edited ? '<button class="bigBtn" id="fReset">الرجوع للأوقات الأصلية</button>' : ""}
     ${!isNew && m.mine ? '<button class="bigBtn danger" id="fDelete">حذف هذا المسجد</button>' : ""}
+    ${!isNew && !m.mine && admin ? '<button class="bigBtn danger" id="fAdminDelete">🗑 حذف المسجد عند الجميع (مشرف)</button>' : ""}
     <div class="msg" id="fMsg">يُحفظ على جوالك مباشرة. وإن اخترت المشاركة، يُرسل اسم المسجد وموقعه وأوقاته فقط (دون أي معلومات عنك) ليُراجَع ثم يظهر للجميع.</div>
   </div>`;
   const pad = v => v.length === 4 ? "0" + v : v;
@@ -932,6 +933,25 @@ function renderEdit(id, newPos) {
     if (shareMsg) $("sheetMsg").textContent = shareMsg;
   };
   if ($("fReset")) $("fReset").onclick = () => { delete overrides[m.id]; store.set("overrides", overrides); applyMosque(); sheetView = "list"; renderSheet(); };
+  // المشرف: حذف مسجد من القاعدة فيختفي عند الجميع
+  if ($("fAdminDelete")) $("fAdminDelete").onclick = async () => {
+    if (!confirm(`حذف «${m.name}» عند كل من ثبّت التطبيق؟`)) return;
+    $("fMsg").textContent = "جارٍ الحذف…";
+    try {
+      // مساجد ملف التطبيق الأساسي (GitHub) لا تُحذف من هنا
+      const inAppFile = (await fetchGithubMosques().catch(() => [])).some(x => x.id === m.id);
+      if (inAppFile) { $("fMsg").textContent = "هذا المسجد من ملف التطبيق الأساسي؛ اطلب حذفه في المحادثة (لا يُحذف من هنا)."; return; }
+      const res = await adminFetch(`/rest/v1/mosques?id=eq.${encodeURIComponent(m.id)}`, { method: "DELETE", headers: { Prefer: "return=representation" } });
+      const gone = await res.json();
+      if (!gone.length) { $("fMsg").textContent = "لم يُحذف شيء (ربما حُذف سابقاً)."; }
+      baseMosques = baseMosques.filter(x => x.id !== m.id); store.set("mosques", baseMosques);
+      delete overrides[m.id]; store.set("overrides", overrides);
+      favs = favs.filter(x => x !== m.id); store.set("favMosques", favs);
+      if (choice.mode === "fixed" && choice.id === m.id) { choice = { mode: "auto" }; store.set("mosqueChoice", choice); }
+      applyMosque(); sheetView = "list"; renderSheet();
+      $("sheetMsg").textContent = `🗑 حُذف «${m.name}» عند الجميع.`;
+    } catch (e) { $("fMsg").textContent = "تعذّر الحذف: " + (e.message || e); }
+  };
   if ($("fDelete")) $("fDelete").onclick = () => {
     myMosques = myMosques.filter(x => x.id !== m.id); store.set("myMosques", myMosques);
     if (choice.mode === "fixed" && choice.id === m.id) { choice = { mode: "auto" }; store.set("mosqueChoice", choice); }
