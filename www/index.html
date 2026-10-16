@@ -122,6 +122,18 @@
   .updateBar { display:block; width:100%; background:var(--accent); color:var(--on-accent); border:none; border-radius:14px;
                padding:10px 14px; font-size:1rem; font-weight:700; text-align:center; }
   .updateBar[hidden] { display:none; }
+  /* وضع المشرف */
+  .adminBar { background:transparent; color:var(--accent); border:1.5px solid var(--accent); }
+  .linkBtn { border:none; padding:4px; font-size:.8rem; color:var(--muted); justify-self:center; align-self:center; }
+  .subCard { background:var(--card); border-radius:14px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+  .subCard .hd { font-size:1.05rem; font-weight:700; }
+  .subCard .meta { color:var(--muted); font-size:.8rem; }
+  .subCard table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  .subCard td { padding:3px 4px; border-top:1px solid var(--hair); }
+  .subCard td.chg { color:var(--accent); font-weight:700; }
+  .subCard .acts { display:flex; gap:8px; }
+  .subCard .acts button { flex:1; padding:10px; font-size:1rem; }
+  .subCard .ok { background:var(--accent); color:var(--on-accent); }
   #sheet { position:fixed; inset:0; background:var(--bg); z-index:11; display:flex; flex-direction:column;
            padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
   #sheet[hidden] { display:none; }
@@ -157,6 +169,7 @@
 <body>
 <div class="wrap">
   <button class="updateBar" id="updateBar" hidden></button>
+  <button class="updateBar adminBar" id="adminBar" hidden></button>
   <div class="top">
     <button class="mosqueSwitch" id="mosquesBtn" aria-label="تغيير المسجد"><h1 id="name"></h1><span class="chev">⌄</span></button>
     <div class="where"><span id="whereText"></span><button class="whereGo" id="whereGo" hidden>· 🧭 الطريق</button></div>
@@ -228,6 +241,7 @@
     <div class="updated" id="updated"></div>
     <div class="updated" id="version"></div>
     <div class="updated" id="otaStatus"></div>
+    <button class="linkBtn" id="adminBtn">🔐 دخول المشرف</button>
     </div>
   </details>
 </div>
@@ -569,6 +583,140 @@ async function submitSuggestion(s) {
   } catch { return false; }
 }
 
+// ---------- وضع المشرف (صاحب التطبيق): اعتماد الاقتراحات والنشر المباشر ----------
+// تسجيل الدخول بحساب Supabase؛ الحماية الحقيقية في قاعدة البيانات (جدول app_admins وسياساته)
+let admin = store.get("adminSession", null);   // {access_token, refresh_token, expires_at, email}
+let pendingSubs = [];
+function saveSession(j) {
+  admin = { access_token: j.access_token, refresh_token: j.refresh_token,
+            expires_at: Math.floor(Date.now() / 1000) + (j.expires_in || 3600),
+            email: (j.user && j.user.email) || (admin && admin.email) || "" };
+  store.set("adminSession", admin);
+}
+function adminLogout() { admin = null; store.set("adminSession", null); pendingSubs = []; renderAdmin(); }
+let refreshing = null;   // طلب تجديد واحد في نفس الوقت
+async function adminToken() {
+  if (!admin) return null;
+  if (Date.now() / 1000 < admin.expires_at - 60) return admin.access_token;
+  if (!refreshing) refreshing = (async () => {
+    const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST", headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: admin.refresh_token }) });
+    if (r.ok) saveSession(await r.json());
+    else if (r.status === 400 || r.status === 401) adminLogout();
+  })().finally(() => { refreshing = null; });
+  try { await refreshing; } catch {}
+  return admin ? admin.access_token : null;
+}
+async function adminFetch(path, opts = {}) {
+  const t = await adminToken();
+  if (!t) throw new Error("سجّل الدخول مرة أخرى");
+  const res = await fetch(SUPA_URL + path, { ...opts,
+    headers: { apikey: SUPA_KEY, Authorization: "Bearer " + t, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  if (!res.ok) {
+    let msg = res.status;
+    try { const j = await res.json(); msg = j.message || j.msg || j.error_description || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res;
+}
+async function adminLogin(email, password) {
+  const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST", headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }) });
+  if (!r.ok) throw new Error("البريد أو كلمة السر غير صحيحة");
+  saveSession(await r.json());
+  const rows = await (await adminFetch("/rest/v1/app_admins?select=user_id")).json();
+  if (!rows.length) { adminLogout(); throw new Error("هذا الحساب ليس مشرفاً"); }
+}
+async function loadPending() {
+  if (!admin) return;
+  try {
+    pendingSubs = await (await adminFetch("/rest/v1/mosque_submissions?status=eq.pending&select=*&order=created_at.asc")).json();
+  } catch { pendingSubs = []; }
+  renderAdmin();
+}
+function renderAdmin() {
+  $("adminBtn").textContent = admin ? `🔐 المشرف: ${admin.email} · الاقتراحات · خروج` : "🔐 دخول المشرف";
+  const n = pendingSubs.length;
+  $("adminBar").hidden = !admin || !n;
+  $("adminBar").textContent = n === 1 ? "📥 اقتراح جديد للمراجعة" : n === 2 ? "📥 اقتراحان جديدان للمراجعة" : `📥 ${n} اقتراحات جديدة للمراجعة`;
+  if (!$("sheet").hidden && sheetView === "review") renderReview();
+}
+function openAdminView(view) {
+  sheetView = view;
+  view === "login" ? renderLogin() : renderReview();
+  $("sheet").hidden = false; history.pushState({ sheet: true }, "");
+}
+function renderLogin() {
+  $("sheetTitle").textContent = "دخول المشرف"; $("sheetBack").textContent = "🏠 الرئيسية"; $("sheetHome").hidden = true;
+  $("sheetBody").innerHTML = `<div class="form" style="display:flex;flex-direction:column;gap:8px">
+    <div class="msg">لصاحب التطبيق فقط: لاعتماد اقتراحات الناس ونشر المساجد مباشرة.</div>
+    <label>البريد<input type="email" id="aEmail" dir="ltr" autocomplete="username"></label>
+    <label>كلمة السر<input type="password" id="aPass" dir="ltr" autocomplete="current-password"></label>
+    <button class="bigBtn" id="aLogin">دخول</button>
+    <div class="msg" id="aMsg"></div></div>`;
+  $("aLogin").onclick = async () => {
+    $("aLogin").disabled = true; $("aMsg").textContent = "جارٍ الدخول…";
+    try {
+      await adminLogin($("aEmail").value.trim(), $("aPass").value);
+      await loadPending();
+      sheetView = "review"; renderReview();
+    } catch (e) { $("aMsg").textContent = e.message || "تعذّر الدخول"; $("aLogin").disabled = false; }
+  };
+}
+function renderReview() {
+  $("sheetTitle").textContent = "الاقتراحات"; $("sheetBack").textContent = "🏠 الرئيسية"; $("sheetHome").hidden = true;
+  const PN = ["الفجر", "الظهر", "العصر", "المغرب", "العشاء"];
+  const cards = pendingSubs.map(s => {
+    const old = s.kind === "times" ? allMosques().find(m => m.id === s.mosque_id) : null;
+    const rows = PN.map((n, i) => {
+      const nv = s.prayers[i] && s.prayers[i].iqama, ov = old && old.prayers[i] && old.prayers[i].iqama;
+      return `<tr><td>${n}</td>${old ? `<td>${fmt12(ov)}</td>` : ""}<td class="${old && ov !== nv ? "chg" : ""}">${fmt12(nv)}</td></tr>`;
+    }).join("") + `<tr><td>الجمعة</td>${old ? `<td>${fmt12(old.jumuah)}</td>` : ""}<td class="${old && old.jumuah !== s.jumuah ? "chg" : ""}">${fmt12(s.jumuah)}</td></tr>`;
+    const d = s.kind === "new" && here ? distKm(here, s) : null;
+    return `<div class="subCard" data-sid="${escapeHtml(s.id)}">
+      <div class="hd">${s.kind === "new" ? "🕌 مسجد جديد: " : "⏰ تعديل أوقات: "}${escapeHtml(old ? old.name : s.name)}</div>
+      <div class="meta">${new Date(s.created_at).toLocaleString("ar-u-nu-latn", { dateStyle: "short", timeStyle: "short" })}${d !== null ? " · على بعد " + fmtDist(d) + " منك" : ""}</div>
+      <table>${old ? '<tr><td></td><td class="meta">الحالي</td><td class="meta">المقترح</td></tr>' : ""}${rows}</table>
+      ${s.kind === "new" ? `<button data-map="${s.lat},${s.lng}">🗺 رؤية الموقع على الخريطة</button>` : ""}
+      <div class="acts"><button class="ok" data-approve="${escapeHtml(s.id)}">✅ اعتماد</button><button data-reject="${escapeHtml(s.id)}">❌ رفض</button></div>
+      <div class="meta" data-msg="${escapeHtml(s.id)}"></div>
+    </div>`;
+  }).join("");
+  $("sheetBody").innerHTML = (cards || '<div class="mEmpty">لا توجد اقتراحات جديدة 👍</div>') +
+    '<button class="linkBtn" id="aLogout">تسجيل الخروج من وضع المشرف</button>';
+}
+// نشر مسجد مباشرة في القاعدة (للمشرف): إضافة أو تحديث بنفس الرقم
+async function publishMosque(m) {
+  const row = { id: m.id, name: m.name, lat: m.lat, lng: m.lng, note: m.note || "", prayers: m.prayers, jumuah: m.jumuah,
+                updated_at: new Date().toISOString() };
+  await adminFetch("/rest/v1/mosques?on_conflict=id", { method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row) });
+  baseMosques = baseMosques.filter(x => x.id !== m.id).concat([{ ...row }]);
+  store.set("mosques", baseMosques);
+}
+async function reviewSub(id, approve) {
+  const s = pendingSubs.find(x => x.id === id);
+  const msg = document.querySelector(`[data-msg="${id}"]`);
+  if (!s) return;
+  if (msg) msg.textContent = approve ? "جارٍ الاعتماد…" : "جارٍ الرفض…";
+  try {
+    if (approve && s.kind === "times") {
+      // نتأكد أن المسجد موجود في القاعدة بأوقاته الجديدة (بعض المساجد كانت في ملف التطبيق فقط)
+      const m = baseMosques.find(x => x.id === s.mosque_id);
+      if (m && hasPos(m)) await publishMosque({ ...m, prayers: s.prayers, jumuah: s.jumuah });
+    }
+    await adminFetch(`/rest/v1/mosque_submissions?id=eq.${encodeURIComponent(id)}`, { method: "PATCH",
+      headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: approve ? "approved" : "rejected" }) });
+    pendingSubs = pendingSubs.filter(x => x.id !== id);
+    renderAdmin(); renderReview();
+    if (approve) { refreshMosques(); $("sheetBody").insertAdjacentHTML("afterbegin", '<div class="msg">✅ اعتُمد، وسيظهر للجميع خلال دقائق.</div>'); }
+  } catch (e) { if (msg) msg.textContent = "تعذّر: " + (e.message || e); }
+}
+$("adminBar").onclick = () => openAdminView("review");
+$("adminBtn").onclick = () => admin ? (loadPending(), openAdminView("review")) : openAdminView("login");
+
 // ---------- شاشة المساجد ----------
 let sheetView = "list";
 // صفحة مسجد: أوقاته والإقامة القادمة فيه، ثم زر الطريق إليه
@@ -670,6 +818,10 @@ function renderMosqueList() {
 }
 $("sheetBody").addEventListener("click", async e => {
   const t = e.target;
+  if (t.dataset && t.dataset.approve) return reviewSub(t.dataset.approve, true);
+  if (t.dataset && t.dataset.reject) return reviewSub(t.dataset.reject, false);
+  if (t.dataset && t.dataset.map) { window.location.href = "https://maps.google.com/?q=" + t.dataset.map; return; }
+  if (t.id === "aLogout") { adminLogout(); history.back(); return; }
   if (t.dataset && t.dataset.edit) { e.stopPropagation(); return renderEdit(t.dataset.edit); }
   if (t.dataset && t.dataset.fav) {
     e.stopPropagation();
@@ -714,7 +866,7 @@ function renderEdit(id, newPos) {
     ${isMine ? `<label>الموقع<input type="text" id="fPos" inputmode="decimal" dir="ltr" placeholder="18.131270,-15.963919"
         value="${m && hasPos(m) ? m.lat + "," + m.lng : (newPos ? newPos.lat.toFixed(6) + "," + newPos.lng.toFixed(6) : "")}"></label>
       <button class="bigBtn" id="fHere" type="button">📍 استعمل موقعي الحالي</button>` : ""}
-    <label>شارك مع الجميع (بعد المراجعة)<input type="checkbox" id="fShare" checked></label>
+    <label>${admin ? "انشر للجميع مباشرة (مشرف)" : "شارك مع الجميع (بعد المراجعة)"}<input type="checkbox" id="fShare" checked></label>
     <button class="bigBtn" id="fSave">حفظ</button>
     ${!isNew && m.edited ? '<button class="bigBtn" id="fReset">الرجوع للأوقات الأصلية</button>' : ""}
     ${!isNew && m.mine ? '<button class="bigBtn danger" id="fDelete">حذف هذا المسجد</button>' : ""}
@@ -756,6 +908,19 @@ function renderEdit(id, newPos) {
     if ($("fShare").checked) {
       $("fSave").disabled = true; $("fMsg").textContent = "جارٍ الإرسال…";
       const target = isNew ? myMosques[myMosques.length - 1] : (m.mine ? myMosques.find(x => x.id === m.id) : null);
+      if (admin) {
+        // المشرف: ينشر مباشرة بنفس رقم المسجد، ثم يُزال من "مساجدي" لأنه صار عاماً
+        try {
+          const pub = target ? { ...target } : { ...baseMosques.find(x => x.id === m.id), prayers: ps, jumuah: pad(j) };
+          await publishMosque(pub);
+          if (target) { myMosques = myMosques.filter(x => x.id !== target.id); store.set("myMosques", myMosques); }
+          else { delete overrides[m.id]; store.set("overrides", overrides); }
+          shareMsg = "✅ نُشر للجميع مباشرة.";
+        } catch (e) { shareMsg = "حُفظ على جوالك، لكن تعذّر النشر: " + (e.message || e); }
+        applyMosque(); sheetView = "list"; renderSheet();
+        $("sheetMsg").textContent = shareMsg;
+        return;
+      }
       const sub = target
         ? { kind: "new", name, lat: target.lat, lng: target.lng, prayers: ps, jumuah: pad(j) }
         : { kind: "times", mosque_id: m.id, name: m.name, prayers: ps, jumuah: pad(j) };
@@ -1211,13 +1376,15 @@ applyMosque(false);
 setInterval(render, 1000);
 scheduleAll();
 refreshMosques();
+renderAdmin();
+loadPending();
 locate();
 checkUpdate();
 // عند الرجوع إلى التطبيق (دون إغلاقه) نبحث أيضاً عن تحديث، مرة كل 10 دقائق على الأكثر
 let lastUpdateCheck = Date.now();
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
-  refreshMosques(); locate(); refreshBgLoc();
+  refreshMosques(); locate(); refreshBgLoc(); loadPending();
   if (Date.now() - lastUpdateCheck > 10 * 60 * 1000) { lastUpdateCheck = Date.now(); checkUpdate(); }
 });
 </script>
