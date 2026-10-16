@@ -7,7 +7,7 @@
 <style>
   /* خط أميري (رخصة OFL) مضمّن في التطبيق لنصوص القرآن والأذكار */
   @font-face { font-family:"Amiri"; font-weight:400; font-display:swap; src:url("fonts/amiri-400.woff2") format("woff2"); }
-  @font-face { font-family:"Naskh"; font-weight:600; font-display:swap; src:url("fonts/naskh-600.woff2") format("woff2"); }
+  @font-face { font-family:"AmiriQuran"; font-display:swap; src:url("fonts/amiri-quran.woff2") format("woff2"); }
   @font-face { font-family:"Warsh"; font-display:swap; src:url("fonts/warsh.woff2") format("woff2"); }
   @font-face { font-family:"Amiri"; font-weight:700; font-display:swap; src:url("fonts/amiri-700.woff2") format("woff2"); }
   :root { --bg:#0f2a24; --card:#163a32; --card2:#1d4a40; --line:rgba(212,168,75,.35); --hair:rgba(243,239,226,.08); --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
@@ -74,7 +74,7 @@
   .zoom { display:flex; gap:6px; }
   .zoom button { width:40px; height:40px; padding:0; border-radius:50%; font-size:1.4rem; line-height:1; font-weight:700; }
   /* حجم واحد لكل الأذكار يغيّره المستخدم بزرّي + و − ، والنص الطويل يُمرَّر */
-  .dhikr .txt { flex:1; min-height:0; overflow-y:auto; font-size:26px; line-height:2; font-family:"Naskh","Amiri",serif; font-weight:600;
+  .dhikr .txt { flex:1; min-height:0; overflow-y:auto; font-size:26px; line-height:2; font-family:"AmiriQuran","Amiri",serif; font-weight:400;
                 text-align:center; display:flex; flex-direction:column; justify-content:safe center; }
   .counter { align-self:center; width:96px; height:96px; border-radius:50%; border:3px solid var(--accent); color:var(--accent);
              display:flex; flex-direction:column; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
@@ -970,7 +970,7 @@ async function openAdhkar(sec) {
   page = savedPage && savedPage.day === todayKey() ? savedPage.page : 0;
   $("adhkarView").hidden = false;
   renderAdhkar();
-  try { await document.fonts.load('600 26px "Naskh"'); } catch {}
+  try { await document.fonts.load('26px "AmiriQuran"'); } catch {}
   history.pushState({ adhkar: true }, "");
 }
 function closeAdhkar() { $("adhkarView").hidden = true; }
