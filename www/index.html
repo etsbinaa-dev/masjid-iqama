@@ -567,6 +567,9 @@ function renderEdit(id, newPos) {
     <label>اسم المسجد ${isMine ? `<input type="text" id="fName" value="${m ? escapeHtml(m.name) : ""}" placeholder="مثلاً: مسجد النور">` : `<b>${escapeHtml(m.name)}</b>`}</label>
     ${prayers.map((p, i) => `<label>${PRAYER_LABELS[i]}<input type="time" id="fT${i}" value="${p.iqama}"></label>`).join("")}
     <label>الجمعة<input type="time" id="fJ" value="${jum}"></label>
+    ${isMine ? `<label>الموقع<input type="text" id="fPos" inputmode="decimal" dir="ltr" placeholder="18.131270,-15.963919"
+        value="${m && hasPos(m) ? m.lat + "," + m.lng : (newPos ? newPos.lat.toFixed(6) + "," + newPos.lng.toFixed(6) : "")}"></label>
+      <button class="bigBtn" id="fHere" type="button">📍 استعمل موقعي الحالي</button>` : ""}
     <label>شارك مع الجميع (بعد المراجعة)<input type="checkbox" id="fShare" checked></label>
     <button class="bigBtn" id="fSave">حفظ</button>
     ${!isNew && m.edited ? '<button class="bigBtn" id="fReset">الرجوع للأوقات الأصلية</button>' : ""}
@@ -574,6 +577,18 @@ function renderEdit(id, newPos) {
     <div class="msg" id="fMsg">يُحفظ على جوالك مباشرة. وإن اخترت المشاركة، يُرسل اسم المسجد وموقعه وأوقاته فقط (دون أي معلومات عنك) ليُراجَع ثم يظهر للجميع.</div>
   </div>`;
   const pad = v => v.length === 4 ? "0" + v : v;
+  if ($("fHere")) $("fHere").onclick = async () => {
+    $("fMsg").textContent = "جارٍ تحديد موقعك…";
+    try { const p = await getPosition(); $("fPos").value = p.lat.toFixed(6) + "," + p.lng.toFixed(6); $("fMsg").textContent = "تم أخذ موقعك الحالي. اضغط حفظ."; }
+    catch { $("fMsg").textContent = "تعذّر تحديد موقعك. فعّل الموقع (GPS)، أو الصق الإحداثيات من خرائط Google."; }
+  };
+  // يقبل "18.131270,-15.963919" (بفاصلة أو مسافة)
+  const parsePos = v => {
+    const mm = String(v || "").trim().match(/^(-?\d+(?:\.\d+)?)\s*[,،\s]\s*(-?\d+(?:\.\d+)?)$/);
+    if (!mm) return null;
+    const lat = +mm[1], lng = +mm[2];
+    return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+  };
   $("fSave").onclick = async () => {
     const vals = PRAYER_LABELS.map((_, i) => $("fT" + i).value);
     const j = $("fJ").value;
@@ -581,11 +596,13 @@ function renderEdit(id, newPos) {
     if (!name) { $("fMsg").textContent = "اكتب اسم المسجد."; return; }
     if (!vals.every(validTime) || !validTime(j)) { $("fMsg").textContent = "أكمل كل الأوقات قبل الحفظ."; return; }
     const ps = PRAYER_LABELS.map((n, i) => ({ name: n, iqama: pad(vals[i]) }));
+    const pos = isMine ? parsePos($("fPos").value) : null;
+    if (isMine && !pos) { $("fMsg").textContent = "اكتب الموقع بهذا الشكل: 18.131270,-15.963919 أو اضغط «استعمل موقعي الحالي»."; return; }
     if (isNew) {
-      const nm = { id: "u" + Date.now(), name, lat: newPos.lat, lng: newPos.lng, note: "", prayers: ps, jumuah: pad(j) };
+      const nm = { id: "u" + Date.now(), name, lat: pos.lat, lng: pos.lng, note: "", prayers: ps, jumuah: pad(j) };
       myMosques.push(nm);
     } else if (m.mine) {
-      myMosques = myMosques.map(x => x.id === m.id ? { ...x, name, prayers: ps, jumuah: pad(j) } : x);
+      myMosques = myMosques.map(x => x.id === m.id ? { ...x, name, lat: pos.lat, lng: pos.lng, prayers: ps, jumuah: pad(j) } : x);
     } else {
       overrides[m.id] = { prayers: ps, jumuah: pad(j) };
       store.set("overrides", overrides);
