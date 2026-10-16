@@ -236,7 +236,7 @@
   <div class="adhkarHead">
     <button id="sheetBack">🏠 الرئيسية</button>
     <h2 id="sheetTitle">المساجد</h2>
-    <span style="width:90px"></span>
+    <span style="width:90px;display:flex;justify-content:flex-end"><button id="sheetHome" style="white-space:nowrap" hidden>🏠 الرئيسية</button></span>
   </div>
   <div id="sheetBody"></div>
 </div>
@@ -577,6 +577,7 @@ function renderMosquePage(id) {
   const m = allMosques().find(x => x.id === id);
   if (!m) return;
   $("sheetBack").textContent = "🏠 الرئيسية";
+  $("sheetHome").hidden = true;
   const now = new Date();
   const list = m.prayers.map(p => ({ ...p }));
   if (now.getDay() === 5) list[1] = { name: "الجمعة", iqama: m.jumuah };
@@ -622,6 +623,7 @@ function renderSheet() {
   const body = $("sheetBody");
   $("sheetTitle").textContent = "المساجد";
   $("sheetBack").textContent = "🏠 الرئيسية";
+  $("sheetHome").hidden = true;
   showAllMosques = false;
   body.innerHTML = `
     <div class="mrow ${choice.mode === "auto" ? "sel" : ""}" data-auto="1">
@@ -699,6 +701,7 @@ $("sheetBody").addEventListener("click", async e => {
 function renderEdit(id, newPos) {
   sheetView = "edit";
   $("sheetBack").textContent = "رجوع";   // من صفحة التعديل نرجع إلى قائمة المساجد
+  $("sheetHome").hidden = false;         // وزر الرئيسية في الجهة الأخرى
   const m = id ? allMosques().find(x => x.id === id) : null;
   const isNew = !m, isMine = isNew || m.mine;
   const prayers = m ? m.prayers : PRAYER_LABELS.map(name => ({ name, iqama: "" }));
@@ -772,6 +775,7 @@ function renderEdit(id, newPos) {
 }
 $("mosquesBtn").onclick = openSheet;
 $("shareMain").onclick = () => current && shareMosque(current);
+$("sheetHome").onclick = () => history.back();
 $("sheetBack").onclick = () => { if (sheetView === "edit") { sheetView = "list"; renderSheet(); } else history.back(); };
 
 function showUpdated() {
