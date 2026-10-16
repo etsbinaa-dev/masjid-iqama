@@ -8,6 +8,7 @@
   /* خط أميري (رخصة OFL) مضمّن في التطبيق لنصوص القرآن والأذكار */
   @font-face { font-family:"Amiri"; font-weight:400; font-display:swap; src:url("fonts/amiri-400.woff2") format("woff2"); }
   @font-face { font-family:"Naskh"; font-weight:600; font-display:swap; src:url("fonts/naskh-600.woff2") format("woff2"); }
+  @font-face { font-family:"Warsh"; font-display:swap; src:url("fonts/warsh.woff2") format("woff2"); }
   @font-face { font-family:"Amiri"; font-weight:700; font-display:swap; src:url("fonts/amiri-700.woff2") format("woff2"); }
   :root { --bg:#0f2a24; --card:#163a32; --card2:#1d4a40; --line:rgba(212,168,75,.35); --hair:rgba(243,239,226,.08); --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
   /* الوضع الفاتح (اختياري من الإعدادات): نفس الهوية، بأرضية فاتحة وذهبي أغمق ليبقى مقروءاً */
@@ -101,6 +102,13 @@
   .dhikr .txt .lead { color:var(--accent); font-size:.82em; }
   .dhikr .txt .gap { height:.5em; }
   .dhikr .txt .an { color:var(--accent); }
+  /* سورة الكهف برواية ورش: خط مجمع الملك فهد */
+  #kahfView { position:fixed; inset:0; background:var(--bg); z-index:10; display:flex; flex-direction:column; }
+  #kahfView[hidden] { display:none; }
+  .kahfCard { flex:1; min-height:0; background:var(--card); border-radius:14px; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+  #kahfText { flex:1; min-height:0; overflow-y:auto; font-family:"Warsh",serif; font-size:26px; line-height:2.1; text-align:center; }
+  #kahfText .basmala { color:var(--accent); margin-bottom:.3em; }
+  .kahfBtn { margin-top:10px; }
   .mosqueSwitch { align-self:center; display:flex; align-items:center; gap:8px; background:none; border:none; color:var(--text);
                   padding:2px 14px; border-radius:999px; }
   .mosqueSwitch:active { background:var(--card); }
@@ -157,6 +165,7 @@
     <button class="adhkarBtn" data-sec="evening"><small>أذكار</small><span>المساء</span></button>
     <button class="adhkarBtn" data-sec="sleep"><small>أذكار</small><span>النوم</span></button>
   </div>
+  <button class="adhkarBtn kahfBtn" id="kahfOpen">📖 سورة الكهف · رواية ورش</button>
   <details class="settings" id="settingsBox">
     <summary id="settingsSummary">⚙ الإعدادات</summary>
     <div class="body">
@@ -238,6 +247,27 @@
     <div class="nav">
       <button id="dhikrPrev">السابق</button>
       <button id="dhikrNext">التالي</button>
+    </div>
+  </div>
+</div>
+
+<div id="kahfView" hidden>
+  <div class="adhkarHead">
+    <button id="kahfBack">رجوع</button>
+    <div style="text-align:center"><h2>سورة الكهف</h2><small>رواية ورش عن نافع</small></div>
+    <span style="width:52px"></span>
+  </div>
+  <div class="pager">
+    <div class="kahfCard" id="kahfCard">
+      <div class="dhead">
+        <div class="title" id="kahfPage"></div>
+        <div class="zoom"><button id="kZoomOut" aria-label="تصغير الخط">−</button><button id="kZoomIn" aria-label="تكبير الخط">+</button></div>
+      </div>
+      <div id="kahfText"></div>
+    </div>
+    <div class="nav">
+      <button id="kahfPrev">السابق</button>
+      <button id="kahfNext">التالي</button>
     </div>
   </div>
 </div>
@@ -745,7 +775,7 @@ async function scheduleAdhkarReminders() {
     try { await Notif.createChannel({ id: "adhkar", name: "تذكير الأذكار", importance: 3, visibility: 1 }); } catch {}
     // الجمعة (6) الساعة 9 صباحاً
     await Notif.schedule({ notifications: [{ id: 903, channelId: "adhkar", title: "يوم الجمعة",
-      body: "لا تنسَ قراءة سورة الكهف والإكثار من الصلاة على النبي ﷺ", smallIcon: "ic_stat_iqama",
+      body: "اضغط لقراءة سورة الكهف، وأكثِر من الصلاة على النبي ﷺ", smallIcon: "ic_stat_iqama", extra: { sec: "kahf" },
       schedule: { on: { weekday: 6, hour: 9, minute: 0 }, allowWhileIdle: true } }] });
   }
   if (!settings.adhkarRemind) return;
@@ -828,7 +858,7 @@ $("hijriAdj").onchange = e => { settings.hijriAdj = Number(e.target.value); stor
 // الضغط على تذكير الأذكار يفتح القسم المناسب
 if (Notif) { try { Notif.addListener("localNotificationActionPerformed", ev => {
   const sec = ev && ev.notification && ev.notification.extra && ev.notification.extra.sec;
-  if (sec) openAdhkar(sec);
+  if (sec === "kahf") openKahf(); else if (sec) openAdhkar(sec);
 }); } catch {} }
 $("exactBtn").onclick = async () => {
   try { await Notif.changeExactNotificationSetting(); } catch {}
@@ -947,7 +977,55 @@ function closeAdhkar() { $("adhkarView").hidden = true; }
 document.querySelectorAll(".adhkarBtn[data-sec]").forEach(b => { b.onclick = () => openAdhkar(b.dataset.sec); });
 $("adhkarBack").onclick = () => history.back();
 // زر الرجوع في الجوال يغلق صفحة الأذكار بدل إغلاق التطبيق
-window.addEventListener("popstate", () => { closeAdhkar(); closeSheet(); });
+window.addEventListener("popstate", () => { closeAdhkar(); closeSheet(); closeKahf(); });
+
+// ---------- سورة الكهف (رواية ورش عن نافع، نص وخط مجمع الملك فهد) ----------
+// صفحة بصفحة كما في مصحف ورش (293–304)، ويُحفظ آخر موضع
+let kahf = null, kPage = 0;
+const BASMALA_WARSH = "بِسْمِ اِ۬للَّهِ اِ۬لرَّحْمَٰنِ اِ۬لرَّحِيمِ";
+if (!settings.quranPx) settings.quranPx = 26;
+function renderKahf() {
+  const pg = kahf.pages[kPage], el = $("kahfText");
+  $("kahfPage").textContent = `صفحة ${pg.page} · ${kPage + 1} من ${kahf.pages.length}`;
+  el.innerHTML = (kPage === 0 ? `<div class="basmala">${BASMALA_WARSH}</div>` : "") + pg.ayat.map(escapeHtml).join(" ");
+  el.style.fontSize = settings.quranPx + "px";
+  el.scrollTop = 0;
+  $("kahfPrev").disabled = kPage === 0;
+  $("kahfNext").disabled = kPage === kahf.pages.length - 1;
+  $("kahfNext").textContent = kPage === kahf.pages.length - 1 ? "صدق الله العظيم" : "التالي";
+  $("kZoomOut").style.opacity = settings.quranPx <= ZOOM_MIN ? .35 : 1;
+  $("kZoomIn").style.opacity = settings.quranPx >= ZOOM_MAX ? .35 : 1;
+}
+function kahfGo(i) {
+  if (!kahf || i < 0 || i >= kahf.pages.length) return;
+  kPage = i; store.set("kahfPage", kPage); renderKahf();
+}
+async function openKahf() {
+  if (!kahf) { try { kahf = await (await fetch("kahf.json")).json(); } catch { return; } }
+  closeAdhkar();
+  kPage = Math.min(store.get("kahfPage", 0) || 0, kahf.pages.length - 1);
+  $("kahfView").hidden = false;
+  renderKahf();
+  history.pushState({ kahf: true }, "");
+}
+function closeKahf() { $("kahfView").hidden = true; }
+function kZoom(step) {
+  settings.quranPx = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, settings.quranPx + step));
+  store.set("settings", settings); renderKahf();
+}
+$("kahfOpen").onclick = openKahf;
+$("kahfBack").onclick = () => history.back();
+$("kahfNext").onclick = () => kahfGo(kPage + 1);
+$("kahfPrev").onclick = () => kahfGo(kPage - 1);
+$("kZoomIn").onclick = () => kZoom(2);
+$("kZoomOut").onclick = () => kZoom(-2);
+let kTouchX = null;
+$("kahfCard").addEventListener("touchstart", e => { kTouchX = e.touches[0].clientX; }, { passive: true });
+$("kahfCard").addEventListener("touchend", e => {
+  if (kTouchX === null) return;
+  const dx = e.changedTouches[0].clientX - kTouchX; kTouchX = null;
+  if (Math.abs(dx) > 60) kahfGo(kPage + (dx > 0 ? 1 : -1));
+});
 $("adhkarReset").onclick = () => { done = {}; saveDone(); goTo(0); };
 
 // ---------- رقم النسخة والتحديث ----------
