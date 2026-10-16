@@ -744,6 +744,7 @@ function buildAlarms(c = cfg) {
     const at = minus(iqama, n);
     items.push({
       id, hour: at.hour, minute: at.minute, weekday: weekday || 0,
+      iq: Number(iqama.split(":")[0]) * 60 + Number(iqama.split(":")[1]),   // وقت الإقامة بالدقائق (لموعد فحص الموقع)
       sound: settings.sound,
       title: `إقامة ${name} بعد ${minsWord(n)}`,
       body: `${c.mosqueName} — الإقامة ${fmt12(iqama)}`
@@ -761,7 +762,8 @@ function buildAlarms(c = cfg) {
   return items;
 }
 // اختيار أقرب مسجد والتطبيق مغلق: نرسل لنظام التنبيه تنبيهات كل مسجد له موقع،
-// ومعها "فحص" قبل كل صلاة بساعة (قبل أبكر وقت بين المساجد) يأخذ الموقع ويضبط التنبيه على الأقرب
+// ومعها "فحص" قبل كل صلاة بـ20 دقيقة (قبل أبكر إقامة بين المساجد) يأخذ الموقع ويضبط التنبيه على الأقرب،
+// وإن كان التنبيه مضبوطاً قبل الإقامة بأكثر من ذلك فالفحص قبل التنبيه بـ5 دقائق حتى يسبقه دائماً
 function buildAutoPlan(alarms) {
   if (currentWhy === "fixed") return { variants: [], checks: [] };
   const variants = allMosques().filter(hasPos).map(m => ({
@@ -769,12 +771,12 @@ function buildAutoPlan(alarms) {
   }));
   if (variants.length < 2) return { variants: [], checks: [] };
   const checks = alarms.map(a => {
-    let first = 24 * 60;
+    let ring = 24 * 60, iq = 24 * 60;
     for (const v of variants) {
       const x = v.alarms.find(y => y.id === a.id);
-      if (x) first = Math.min(first, x.hour * 60 + x.minute);
+      if (x) { ring = Math.min(ring, x.hour * 60 + x.minute); iq = Math.min(iq, x.iq); }
     }
-    const t = Math.max(0, first - 60);
+    const t = Math.max(0, Math.min(iq - 20, ring - 5));
     return { id: 1000 + a.id, slot: a.id, check: true, hour: Math.floor(t / 60), minute: t % 60, weekday: a.weekday };
   });
   return { variants, checks };
