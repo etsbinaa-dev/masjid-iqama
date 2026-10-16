@@ -228,16 +228,16 @@
 
 <div id="sheet" hidden>
   <div class="adhkarHead">
-    <button id="sheetBack">رجوع</button>
+    <button id="sheetBack">🏠 الرئيسية</button>
     <h2 id="sheetTitle">المساجد</h2>
-    <span style="width:52px"></span>
+    <span style="width:90px"></span>
   </div>
   <div id="sheetBody"></div>
 </div>
 
 <div id="adhkarView" hidden>
   <div class="adhkarHead">
-    <button id="adhkarBack">رجوع</button>
+    <button id="adhkarBack">🏠 الرئيسية</button>
     <div style="text-align:center"><h2 id="adhkarTitle">أذكار المساء</h2><small id="adhkarProgress"></small></div>
     <button id="adhkarReset">إعادة</button>
   </div>
@@ -260,9 +260,9 @@
 
 <div id="kahfView" hidden>
   <div class="adhkarHead">
-    <button id="kahfBack">رجوع</button>
+    <button id="kahfBack">🏠 الرئيسية</button>
     <div style="text-align:center"><h2>سورة الكهف</h2><small>رواية ورش عن نافع</small></div>
-    <span style="width:52px"></span>
+    <span style="width:90px"></span>
   </div>
   <div class="pager">
     <div class="kahfCard" id="kahfCard">
@@ -570,6 +570,7 @@ function openMosquePage(id) { sheetView = "detail"; renderMosquePage(id); $("she
 function renderMosquePage(id) {
   const m = allMosques().find(x => x.id === id);
   if (!m) return;
+  $("sheetBack").textContent = "🏠 الرئيسية";
   const now = new Date();
   const list = m.prayers.map(p => ({ ...p }));
   if (now.getDay() === 5) list[1] = { name: "الجمعة", iqama: m.jumuah };
@@ -605,6 +606,7 @@ function chooseMosque(c) { choice = c; store.set("mosqueChoice", choice); applyM
 function renderSheet() {
   const body = $("sheetBody");
   $("sheetTitle").textContent = "المساجد";
+  $("sheetBack").textContent = "🏠 الرئيسية";
   const list = allMosques().map(m => ({ m, d: here && hasPos(m) ? distKm(here, m) : null }))
     .sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
   const times = m => m.prayers.map(p => fmt12(p.iqama)).join(" · ");
@@ -647,6 +649,7 @@ $("sheetBody").addEventListener("click", async e => {
 // شاشة التعديل: أوقات مسجد موجود، أو مسجد جديد في الموقع الحالي
 function renderEdit(id, newPos) {
   sheetView = "edit";
+  $("sheetBack").textContent = "رجوع";   // من صفحة التعديل نرجع إلى قائمة المساجد
   const m = id ? allMosques().find(x => x.id === id) : null;
   const isNew = !m, isMine = isNew || m.mine;
   const prayers = m ? m.prayers : PRAYER_LABELS.map(name => ({ name, iqama: "" }));
