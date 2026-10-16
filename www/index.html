@@ -118,6 +118,11 @@
   .form input[type=text] { width:60%; }
   .form .msg { color:var(--muted); font-size:.9rem; text-align:center; }
   .danger { color:#e08a7a; border-color:#e08a7a; }
+  .prRows { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .prRows label { background:var(--bg); border-radius:10px; padding:6px 10px; }
+  .prRows select { font-size:.9rem; padding:4px; }
+  .hint2 { color:var(--muted); font-size:.8rem; margin-top:-6px; }
+  .shareBtn { background:none; border:none; color:var(--accent); font-size:.9rem; padding:4px; }
 </style>
 </head>
 <body>
@@ -136,6 +141,7 @@
   </button>
   <div id="list"></div>
   <div class="note" id="note"></div>
+  <button class="shareBtn" id="shareMain">📤 مشاركة أوقات هذا المسجد</button>
 
   <div class="adhkarRow">
     <button class="adhkarBtn" data-sec="morning"><small>أذكار</small><span>الصباح</span></button>
@@ -143,20 +149,22 @@
     <button class="adhkarBtn" data-sec="sleep"><small>أذكار</small><span>النوم</span></button>
   </div>
   <details class="settings" id="settingsBox">
-    <summary id="settingsSummary">⚙ إعدادات التنبيه</summary>
+    <summary id="settingsSummary">⚙ الإعدادات</summary>
     <div class="body">
     <label for="notifyOn">تفعيل التنبيه
       <input type="checkbox" id="notifyOn">
     </label>
-    <div class="chipsLabel">التنبيه لهذه الصلوات (اضغط لإيقاف أو تشغيل):</div>
-    <div class="chips" id="prayerChips"></div>
-    <label for="minutes">قبل الإقامة بـ
-      <select id="minutes">
-        <option value="5">5 دقائق</option>
-        <option value="10">10 دقائق</option>
-        <option value="15">15 دقيقة</option>
-        <option value="20">20 دقيقة</option>
-        <option value="30">30 دقيقة</option>
+    <div class="chipsLabel">التنبيه قبل كل إقامة:</div>
+    <div class="prRows" id="prayerRows"></div>
+    <label for="adhkarRemind">تذكير بأذكار الصباح والمساء
+      <input type="checkbox" id="adhkarRemind">
+    </label>
+    <div class="hint2">بعد إقامة الفجر والعصر بنصف ساعة، بإشعار عادي دون أذان. الضغط عليه يفتح الأذكار.</div>
+    <label for="hijriAdj">تصحيح التاريخ الهجري
+      <select id="hijriAdj">
+        <option value="-1">ناقص يوم</option>
+        <option value="0">كما هو</option>
+        <option value="1">زائد يوم</option>
       </select>
     </label>
     <div class="status" id="notifyStatus"></div>
@@ -232,6 +240,10 @@ let settings = store.get("settings", { on: true, minutes: 10 });
 const PRAYER_KEYS = ["fajr", "dhuhr", "asr", "maghrib", "isha", "jumuah"];
 const PRAYER_NAMES = { fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء", jumuah: "الجمعة" };
 settings.prayers = Object.assign(Object.fromEntries(PRAYER_KEYS.map(k => [k, true])), settings.prayers || {});
+// دقائق التنبيه لكل صلاة (تبدأ من الإعداد العام القديم)
+settings.perMin = Object.assign(Object.fromEntries(PRAYER_KEYS.map(k => [k, settings.minutes || 10])), settings.perMin || {});
+if (settings.adhkarRemind === undefined) settings.adhkarRemind = true;
+if (settings.hijriAdj === undefined) settings.hijriAdj = 0;
 let updatedAt = store.get("updatedAt", null);
 
 const Notif = window.Capacitor && window.Capacitor.isNativePlatform()
@@ -276,7 +288,10 @@ function render() {
   $("note").textContent = cfg.note || "";
   const greg = now.toLocaleDateString("ar-u-nu-latn", { weekday: "long", day: "numeric", month: "long" });
   let hijri = "";
-  try { hijri = now.toLocaleDateString("ar-u-ca-islamic-umalqura-nu-latn", { day: "numeric", month: "long", year: "numeric" }); } catch {}
+  try {
+    const hd = new Date(now.getTime() + (settings.hijriAdj || 0) * 86400000);   // تصحيح رؤية الهلال
+    hijri = hd.toLocaleDateString("ar-u-ca-islamic-umalqura-nu-latn", { day: "numeric", month: "long", year: "numeric" });
+  } catch {}
   $("date").textContent = hijri ? `${greg} · ${hijri}` : greg;
 
   const nx = findNext(now);
@@ -370,6 +385,15 @@ function renderNearest() {
     $("nearName").textContent = here ? "لا توجد مساجد بمواقع معروفة" : "اضغط لتحديد موقعك";
     $("nearGo").textContent = "";
   }
+}
+// مشاركة أوقات مسجد على واتساب (نص جاهز مع الموقع ورابط التطبيق)
+function shareMosque(m) {
+  const lines = m.prayers.map((p, i) => `${PRAYER_LABELS[i]}: ${fmt12(p.iqama)}`);
+  lines.push(`الجمعة: ${fmt12(m.jumuah)}`);
+  const text = `🕌 ${m.name} — أوقات الإقامة\n${lines.join("\n")}` +
+    (hasPos(m) ? `\n📍 الموقع: https://maps.google.com/?q=${m.lat},${m.lng}` : "") +
+    `\n📲 تطبيق أوقات الإقامة: https://github.com/etsbinaa-dev/masjid-iqama/releases/latest/download/masjid-iqama.apk`;
+  window.location.href = "https://wa.me/?text=" + encodeURIComponent(text);
 }
 // يفتح تطبيق خرائط Google بالطريق مشياً إلى المسجد
 function openDirections(m) {
@@ -479,9 +503,11 @@ function renderMosquePage(id) {
       ${now.getDay() === 5 ? "" : `<div class="row"><span class="n">الجمعة</span><span class="t">${fmt12(m.jumuah)}</span></div>`}
     </div>
     ${hasPos(m) ? '<button class="updateBar" id="mpGo">🧭 الطريق إلى المسجد</button>' : ""}
+    <button class="bigBtn" id="mpShare">📤 مشاركة الأوقات على واتساب</button>
     ${isMine ? '<div class="form"><div class="msg">هذا مسجدك الحالي، وتنبيهاتك منه.</div></div>'
              : '<button class="bigBtn" id="mpChoose">اجعله مسجدي (التنبيهات منه)</button>'}`;
   if ($("mpGo")) $("mpGo").onclick = () => openDirections(m);
+  $("mpShare").onclick = () => shareMosque(m);
   if ($("mpChoose")) $("mpChoose").onclick = () => chooseMosque({ mode: "fixed", id: m.id });
 }
 function openSheet() { sheetView = "list"; renderSheet(); $("sheet").hidden = false; history.pushState({ sheet: true }, ""); }
@@ -587,6 +613,7 @@ function renderEdit(id, newPos) {
   };
 }
 $("mosquesBtn").onclick = openSheet;
+$("shareMain").onclick = () => current && shareMosque(current);
 $("sheetBack").onclick = () => { if (sheetView === "edit") { sheetView = "list"; renderSheet(); } else history.back(); };
 
 function showUpdated() {
@@ -602,25 +629,27 @@ function minus(hhmm, mins) {
   const t = ((h * 60 + m - mins) % 1440 + 1440) % 1440;
   return { hour: Math.floor(t / 60), minute: t % 60 };
 }
+const minsWord = n => n <= 10 ? `${n} دقائق` : `${n} دقيقة`;
 function buildAlarms() {
-  const n = settings.minutes;
   const items = [];
+  const key = { "الفجر": "fajr", "الظهر": "dhuhr", "العصر": "asr", "المغرب": "maghrib", "العشاء": "isha", "الجمعة": "jumuah" };
   const add = (id, name, iqama, weekday) => {
+    const n = settings.perMin[key[name] || "fajr"] || 10;
     const at = minus(iqama, n);
     items.push({
       id, hour: at.hour, minute: at.minute, weekday: weekday || 0,
-      title: `إقامة ${name} بعد ${n} دقائق`,
+      title: `إقامة ${name} بعد ${minsWord(n)}`,
       body: `${cfg.mosqueName} — الإقامة ${fmt12(iqama)}`
     });
   };
   const [fajr, dhuhr, asr, maghrib, isha] = cfg.prayers;
   const on = settings.prayers;
-  if (on.fajr) add(1, fajr.name, fajr.iqama);
-  if (on.asr) add(3, asr.name, asr.iqama);
-  if (on.maghrib) add(4, maghrib.name, maghrib.iqama);
-  if (on.isha) add(5, isha.name, isha.iqama);
+  if (on.fajr) add(1, "الفجر", fajr.iqama);
+  if (on.asr) add(3, "العصر", asr.iqama);
+  if (on.maghrib) add(4, "المغرب", maghrib.iqama);
+  if (on.isha) add(5, "العشاء", isha.iqama);
   // الظهر كل الأيام عدا الجمعة (1=الأحد ... 6=الجمعة، 7=السبت)
-  if (on.dhuhr) [1, 2, 3, 4, 5, 7].forEach(d => add(20 + d, dhuhr.name, dhuhr.iqama, d));
+  if (on.dhuhr) [1, 2, 3, 4, 5, 7].forEach(d => add(20 + d, "الظهر", dhuhr.iqama, d));
   if (on.jumuah) add(26, "الجمعة", cfg.jumuah, 6);
   return items;
 }
@@ -640,6 +669,20 @@ async function cleanupOld() {
     try { await Notif.deleteChannel({ id: old }); } catch {}
   }
 }
+// تذكير الأذكار: بعد إقامة الفجر (الصباح) والعصر (المساء) بنصف ساعة
+async function scheduleAdhkarReminders() {
+  if (!Notif) return;
+  try { await Notif.cancel({ notifications: [{ id: 901 }, { id: 902 }] }); } catch {}
+  if (!settings.adhkarRemind) return;
+  try { await Notif.createChannel({ id: "adhkar", name: "تذكير الأذكار", importance: 3, visibility: 1 }); } catch {}
+  const at = (hhmm) => minus(hhmm, -30);
+  const mk = (id, sec, title, hhmm) => ({ id, channelId: "adhkar", title, body: "اضغط لقراءتها",
+    smallIcon: "ic_stat_iqama", extra: { sec }, schedule: { on: at(hhmm), allowWhileIdle: true } });
+  await Notif.schedule({ notifications: [
+    mk(901, "morning", "حان وقت أذكار الصباح", cfg.prayers[0].iqama),
+    mk(902, "evening", "حان وقت أذكار المساء", cfg.prayers[2].iqama)
+  ] });
+}
 async function askPermission() {
   let perm = await Notif.checkPermissions();
   if (perm.display !== "granted") perm = await Notif.requestPermissions();
@@ -652,19 +695,21 @@ async function scheduleAll() {
     if (!settings.on) {
       await Alarm.cancelAll();
       $("notifyStatus").textContent = "التنبيه متوقف.";
-      $("settingsSummary").textContent = "⚙ التنبيه متوقف";
+      $("settingsSummary").textContent = "⚙ الإعدادات (التنبيه متوقف)";
+      try { await scheduleAdhkarReminders(); } catch {}
       return;
     }
     // الصوت يعمل حتى دون إذن الإشعارات، لكن الإشعار المكتوب يحتاجه
     const granted = await askPermission();
     await Alarm.schedule({ alarms: buildAlarms() });
+    try { await scheduleAdhkarReminders(); } catch {}
     if (granted) {
-      $("notifyStatus").textContent = `سيرنّ التطبيق قبل كل إقامة بـ ${settings.minutes} دقائق، حتى في الوضع الصامت.`;
+      $("notifyStatus").textContent = "سيرنّ التطبيق قبل كل إقامة حسب الدقائق المختارة، حتى في الوضع الصامت.";
     } else {
       $("settingsBox").open = true;
       $("notifyStatus").textContent = "سيرنّ الصوت، لكن الإشعار المكتوب لن يظهر لأنك لم تسمح بالإشعارات. فعّلها من إعدادات الجوال ← التطبيقات ← أوقات الإقامة ← الإشعارات.";
     }
-    $("settingsSummary").textContent = `⚙ التنبيه قبل الإقامة بـ ${settings.minutes} دقائق`;
+    $("settingsSummary").textContent = "⚙ الإعدادات";
     try {
       const exact = await Notif.checkExactNotificationSetting();
       $("exactBtn").hidden = exact.exact_alarm === "granted";
@@ -674,20 +719,34 @@ async function scheduleAll() {
   }
 }
 
-function renderChips() {
-  $("prayerChips").innerHTML = PRAYER_KEYS.map(k =>
-    `<button type="button" data-k="${k}" class="${settings.prayers[k] ? "" : "off"}" aria-pressed="${settings.prayers[k]}">${PRAYER_NAMES[k]}</button>`).join("");
+// لكل صلاة: إيقاف، أو عدد الدقائق قبل الإقامة
+function renderPrayerRows() {
+  const opts = [0, 5, 10, 15, 20, 30, 45];
+  $("prayerRows").innerHTML = PRAYER_KEYS.map(k => {
+    const cur = settings.prayers[k] ? settings.perMin[k] : 0;
+    return `<label for="pm_${k}">${PRAYER_NAMES[k]}<select id="pm_${k}" data-k="${k}">${opts.map(o =>
+      `<option value="${o}" ${o === cur ? "selected" : ""}>${o ? o + " د" : "إيقاف"}</option>`).join("")}</select></label>`;
+  }).join("");
 }
-$("prayerChips").addEventListener("click", e => {
+$("prayerRows").addEventListener("change", e => {
   const k = e.target.dataset && e.target.dataset.k; if (!k) return;
-  settings.prayers[k] = !settings.prayers[k];
-  store.set("settings", settings); renderChips(); scheduleAll();
+  const v = Number(e.target.value);
+  settings.prayers[k] = v > 0;
+  if (v > 0) settings.perMin[k] = v;
+  store.set("settings", settings); scheduleAll();
 });
-renderChips();
+renderPrayerRows();
 $("notifyOn").checked = settings.on;
-$("minutes").value = String(settings.minutes);
 $("notifyOn").onchange = e => { settings.on = e.target.checked; store.set("settings", settings); scheduleAll(); };
-$("minutes").onchange = e => { settings.minutes = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
+$("adhkarRemind").checked = settings.adhkarRemind;
+$("adhkarRemind").onchange = e => { settings.adhkarRemind = e.target.checked; store.set("settings", settings); scheduleAdhkarReminders(); };
+$("hijriAdj").value = String(settings.hijriAdj);
+$("hijriAdj").onchange = e => { settings.hijriAdj = Number(e.target.value); store.set("settings", settings); render(); };
+// الضغط على تذكير الأذكار يفتح القسم المناسب
+if (Notif) { try { Notif.addListener("localNotificationActionPerformed", ev => {
+  const sec = ev && ev.notification && ev.notification.extra && ev.notification.extra.sec;
+  if (sec) openAdhkar(sec);
+}); } catch {} }
 $("exactBtn").onclick = async () => {
   try { await Notif.changeExactNotificationSetting(); } catch {}
   scheduleAll();
