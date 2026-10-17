@@ -565,24 +565,45 @@ async function fetchSupabaseMosques() {
   return await res.json();
 }
 // نجمع المصدرين: لكل مسجد نأخذ النسخة الأحدث تعديلاً (updated_at)
+// المصدر الأساسي للمساجد هو قاعدة البيانات (Supabase): ما يُحذف منها يختفي عند الجميع.
+// ملف التطبيق على GitHub احتياطي فقط: يُستعمل إن تعذّر الوصول للقاعدة، أو إن كانت نسخته لمسجد موجود في القاعدة أحدث.
 async function refreshMosques() {
   try {
-    const results = await Promise.allSettled([fetchGithubMosques(), fetchSupabaseMosques()]);
+    const [gh, sb] = await Promise.allSettled([fetchGithubMosques(), fetchSupabaseMosques()]);
+    const sbList = sb.status === "fulfilled" && Array.isArray(sb.value) ? sb.value : [];
+    const sbOk = sbList.length > 0;
+    const sbIds = new Set(sbList.map(m => m.id));
     const byId = new Map();
-    for (const r of results) {
-      if (r.status !== "fulfilled") continue;
-      for (const m of r.value) {
-        if (!validMosque(m)) continue;
-        const old = byId.get(m.id);
-        if (!old || Date.parse(m.updated_at || 0) >= Date.parse(old.updated_at || 0)) byId.set(m.id, m);
-      }
-    }
+    const take = m => {
+      if (!validMosque(m)) return;
+      const old = byId.get(m.id);
+      if (!old || Date.parse(m.updated_at || 0) >= Date.parse(old.updated_at || 0)) byId.set(m.id, m);
+    };
+    sbList.forEach(take);
+    if (gh.status === "fulfilled") gh.value.forEach(m => { if (!sbOk || sbIds.has(m.id)) take(m); });
     const list = [...byId.values()];
     if (!list.length) return;
     baseMosques = list; store.set("mosques", baseMosques);
     updatedAt = new Date().toISOString(); store.set("updatedAt", updatedAt);
     showUpdated(); applyMosque();
+    if (admin && sbOk && gh.status === "fulfilled") syncBaseToDb(gh.value, sbList);
   } catch {}
+}
+// المشرف: نرفع إلى القاعدة نسخ ملف التطبيق الأحدث منها، مرة في كل فتح، فتصبح القاعدة هي المرجع الكامل
+let synced = false;
+async function syncBaseToDb(ghList, sbList) {
+  if (synced) return; synced = true;
+  // أول مرة فقط: نرفع أيضاً المساجد الأساسية الغائبة عن القاعدة (بعدها غيابها يعني أنها حُذفت)
+  const firstTime = !store.get("baseSyncedV1", false);
+  let ok = true;
+  for (const m of ghList) {
+    const db = sbList.find(x => x.id === m.id);
+    if (!validMosque(m)) continue;
+    if (db ? Date.parse(m.updated_at || 0) <= Date.parse(db.updated_at || 0) : !firstTime) continue;
+    try { await publishMosque(m); } catch { ok = false; }
+  }
+  if (ok) store.set("baseSyncedV1", true);
+  if (firstTime) { applyMosque(); }
 }
 // الموقع: نطلبه والتطبيق مفتوح فقط، ثم نختار أقرب مسجد
 function getPosition() {
@@ -1001,9 +1022,6 @@ function renderEdit(id, newPos) {
     if (!confirm(`حذف «${m.name}» عند كل من ثبّت التطبيق؟`)) return;
     $("fMsg").textContent = "جارٍ الحذف…";
     try {
-      // مساجد ملف التطبيق الأساسي (GitHub) لا تُحذف من هنا
-      const inAppFile = (await fetchGithubMosques().catch(() => [])).some(x => x.id === m.id);
-      if (inAppFile) { $("fMsg").textContent = "هذا المسجد من ملف التطبيق الأساسي؛ اطلب حذفه في المحادثة (لا يُحذف من هنا)."; return; }
       const res = await adminFetch(`/rest/v1/mosques?id=eq.${encodeURIComponent(m.id)}`, { method: "DELETE", headers: { Prefer: "return=representation" } });
       const gone = await res.json();
       if (!gone.length) { $("fMsg").textContent = "لم يُحذف شيء (ربما حُذف سابقاً)."; }
