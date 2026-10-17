@@ -10,10 +10,12 @@
   @font-face { font-family:"AmiriQuran"; font-display:swap; src:url("fonts/amiri-quran.woff2") format("woff2"); }
   @font-face { font-family:"Warsh"; font-display:swap; src:url("fonts/warsh.woff2") format("woff2"); }
   @font-face { font-family:"Amiri"; font-weight:700; font-display:swap; src:url("fonts/amiri-700.woff2") format("woff2"); }
-  :root { --bg:#0f2a24; --card:#163a32; --card2:#1d4a40; --line:rgba(212,168,75,.35); --hair:rgba(243,239,226,.08); --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b; color-scheme:dark; }
+  :root { --bg:#0f2a24; --card:#163a32; --card2:#1d4a40; --line:rgba(212,168,75,.35); --hair:rgba(243,239,226,.08); --text:#f3efe2; --muted:#b9c4bd; --accent:#d4a84b; --on-accent:#1b1b1b;
+          --head:#163a32; --headText:#f3efe2; --gold1:#e0bb63; --gold2:#b8902f; --onGold:#1b1205; --navbg:#0c231e; color-scheme:dark; }
   /* الوضع الفاتح (اختياري من الإعدادات): نفس الهوية، بأرضية فاتحة وذهبي أغمق ليبقى مقروءاً */
-  :root[data-theme="light"] { --bg:#f4f2ec; --card:#ffffff; --card2:#e9f1ec; --line:rgba(150,108,24,.45); --hair:rgba(15,42,36,.10);
-    --text:#14302a; --muted:#5b6d66; --accent:#9a6f17; --on-accent:#ffffff; color-scheme:light; }
+  :root[data-theme="light"] { --bg:#f6f1e6; --card:#fffdf8; --card2:#efe7d6; --line:rgba(168,120,31,.40); --hair:rgba(31,58,51,.10);
+    --text:#1f3a33; --muted:#6f7b75; --accent:#a8781f; --on-accent:#ffffff;
+    --head:#1f4a3f; --headText:#f6efdc; --gold1:#d9b25a; --gold2:#b8902f; --onGold:#1b1205; --navbg:#fffdf8; color-scheme:light; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
          padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
@@ -164,36 +166,88 @@
   .prRows select { font-size:.9rem; padding:4px; }
   .hint2 { color:var(--muted); font-size:.8rem; margin-top:-6px; }
   .shareBtn { background:none; border:none; color:var(--accent); font-size:.9rem; padding:4px; }
+  /* ===== التصميم الجديد: رأس أخضر بزخرفة، قائمة تكبر فيها الصلاة القادمة، وشريط ثابت في الأسفل ===== */
+  body { padding-bottom:calc(76px + env(safe-area-inset-bottom,0px)); }
+  .wrap { padding:0 0 18px; gap:12px; }
+  .wrap > :not(.band) { margin-inline:16px; }
+  .band { background:var(--head); color:var(--headText); padding:16px 18px 18px; border-radius:0 0 26px 26px;
+          background-image:radial-gradient(circle at 20px 20px,rgba(255,255,255,.06) 2px,transparent 3px),
+                           radial-gradient(circle at 0 0,rgba(255,255,255,.045) 10px,transparent 11px);
+          background-size:40px 40px,40px 40px; display:flex; flex-direction:column; gap:2px; }
+  .band .date { color:inherit; opacity:.75; font-size:.78rem; }
+  .band .mosqueSwitch { align-self:flex-start; padding:0; color:inherit; }
+  .band h1 { font-size:1.9rem; }
+  .band .chev { color:var(--gold1); }
+  .band .where { color:inherit; opacity:.85; }
+  .band .whereGo { color:var(--gold1); }
+  .band .bgLoc { color:var(--gold1); border-color:var(--gold1); margin:8px 0 0; }
+  #list.plist { display:flex; flex-direction:column; gap:8px; background:none; border-radius:0; padding:0; }
+  .pit { display:flex; justify-content:space-between; align-items:center; padding:13px 18px; border-radius:16px; background:var(--card);
+         font-size:1.08rem; box-shadow:0 1px 6px rgba(0,0,0,.04); }
+  .pit .t { font-variant-numeric:tabular-nums; }
+  .pit.past { background:transparent; box-shadow:none; border:1px solid var(--hair); color:var(--muted); }
+  .pit.next { background:linear-gradient(135deg,var(--gold1),var(--gold2)); color:var(--onGold); padding:16px 18px 14px; flex-wrap:wrap;
+              box-shadow:0 4px 14px rgba(168,120,31,.25); }
+  .pit.next .n { font-family:"Amiri",serif; font-size:1.9rem; font-weight:700; line-height:1.2; }
+  .pit.next .t { font-size:1.7rem; font-weight:700; }
+  .pit.next .cd { width:100%; display:flex; justify-content:space-between; font-size:.85rem; margin-top:2px; }
+  .pit.next .bar { width:100%; height:5px; border-radius:9px; background:rgba(0,0,0,.15); margin-top:8px; overflow:hidden; }
+  .pit.next .bar i { display:block; height:100%; background:var(--onGold); opacity:.55; border-radius:9px; }
+  .subline { display:flex; justify-content:space-between; align-items:center; font-size:.85rem; color:var(--muted); }
+  .page[hidden] { display:none; }
+  .pageTitle { font-family:"Amiri",serif; font-size:1.7rem; font-weight:700; margin:18px 0 4px; }
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .tiles button { background:var(--card); border:none; border-radius:18px; padding:22px 8px; display:flex; flex-direction:column; align-items:center; gap:4px;
+                  color:var(--accent); box-shadow:0 1px 6px rgba(0,0,0,.05); margin:0; }
+  .tiles button small { color:var(--muted); font-size:.8rem; }
+  .tiles button span { font-family:"Amiri",serif; font-size:1.6rem; font-weight:700; }
+  .tiles button i { font-style:normal; font-size:1.6rem; }
+  .settings { border:none; }
+  .settings .body { padding:0; }
+  .settings .body > label { background:var(--card); border-radius:12px; padding:10px 14px; }
+  .bnav { position:fixed; left:0; right:0; bottom:0; z-index:5; display:flex; justify-content:space-around; align-items:center;
+          height:calc(68px + env(safe-area-inset-bottom,0px)); padding-bottom:env(safe-area-inset-bottom,0px);
+          background:var(--navbg); border-top:1px solid var(--hair); }
+  .bnav button { border:none; background:none; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:3px; font-size:.72rem; padding:4px 6px; }
+  .bnav svg { width:24px; height:24px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .bnav .ic { border-radius:999px; padding:3px 18px; }
+  .bnav button.on { color:var(--accent); }
+  .bnav button.on .ic { background:color-mix(in srgb, var(--accent) 16%, transparent); }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <button class="updateBar" id="updateBar" hidden></button>
-  <button class="updateBar adminBar" id="adminBar" hidden></button>
-  <div class="top">
+<div class="wrap page" id="pgHome">
+  <div class="band">
+    <div class="date" id="date"></div>
     <button class="mosqueSwitch" id="mosquesBtn" aria-label="تغيير المسجد"><h1 id="name"></h1><span class="chev">⌄</span></button>
     <div class="where"><span id="whereText"></span><button class="whereGo" id="whereGo" hidden>· 🧭 الطريق</button></div>
     <button class="bgLoc" id="bgLocBtn" hidden>📍 ليتغيّر المسجد تلقائياً وأنت خارج التطبيق: اسمح بالموقع «طوال الوقت»</button>
-    <div class="date" id="date"></div>
   </div>
-  <div class="next" id="next"></div>
+  <button class="updateBar" id="updateBar" hidden></button>
+  <button class="updateBar adminBar" id="adminBar" hidden></button>
+  <div class="plist" id="list"></div>
+  <div class="subline"><span id="jumuahLine"></span><button class="shareBtn" id="shareMain">📤 مشاركة</button></div>
+  <div class="note" id="note"></div>
   <button class="nearBtn" id="nearBtn">
     <span class="ic">🧭</span>
     <span class="tx"><small>أقرب مسجد إليك الآن</small><b id="nearName">جارٍ تحديد موقعك…</b></span>
     <span class="go" id="nearGo">الطريق ‹</span>
   </button>
-  <div id="list"></div>
-  <div class="note" id="note"></div>
-  <button class="shareBtn" id="shareMain">📤 مشاركة أوقات هذا المسجد</button>
+</div>
 
-  <div class="adhkarRow">
-    <button class="adhkarBtn" data-sec="morning"><small>أذكار</small><span>الصباح</span></button>
-    <button class="adhkarBtn" data-sec="evening"><small>أذكار</small><span>المساء</span></button>
-    <button class="adhkarBtn" data-sec="sleep"><small>أذكار</small><span>النوم</span></button>
-    <button class="adhkarBtn" id="kahfOpen"><small>سورة</small><span>الكهف</span></button>
+<div class="wrap page" id="pgAdhkar" hidden>
+  <div class="pageTitle">الأذكار والقرآن</div>
+  <div class="tiles adhkarRow">
+    <button class="adhkarBtn" data-sec="morning"><i>☀️</i><small>أذكار</small><span>الصباح</span></button>
+    <button class="adhkarBtn" data-sec="evening"><i>🌅</i><small>أذكار</small><span>المساء</span></button>
+    <button class="adhkarBtn" data-sec="sleep"><i>🌙</i><small>أذكار</small><span>النوم</span></button>
+    <button class="adhkarBtn" id="kahfOpen"><i>📖</i><small>سورة</small><span>الكهف</span></button>
   </div>
-  <details class="settings" id="settingsBox">
-    <summary id="settingsSummary">⚙ الإعدادات</summary>
+</div>
+
+<div class="wrap page" id="pgSettings" hidden>
+  <div class="pageTitle" id="settingsSummary">الإعدادات</div>
+  <div class="settings" id="settingsBox">
     <div class="body">
     <label for="notifyOn">تفعيل التنبيه
       <input type="checkbox" id="notifyOn">
@@ -243,8 +297,15 @@
     <div class="updated" id="otaStatus"></div>
     <button class="linkBtn" id="adminBtn">🔐 دخول المشرف</button>
     </div>
-  </details>
+  </div>
 </div>
+
+<nav class="bnav" id="bnav">
+  <button data-tab="home" class="on"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></span>الرئيسية</button>
+  <button data-tab="mosques"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>المساجد</button>
+  <button data-tab="adhkar"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6"/></svg></span>الأذكار</button>
+  <button data-tab="settings"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span>الإعدادات</button>
+</nav>
 
 <div id="sheet" hidden>
   <div class="adhkarHead">
@@ -339,6 +400,8 @@ if (settings.fridayRemind === undefined) settings.fridayRemind = true;
 if (!settings.fontPx) settings.fontPx = 16;
 if (!settings.theme) settings.theme = "dark";
 // حجم الخط والمظهر يُطبَّقان فوراً قبل أول رسم
+// التصميم الجديد بألوان فاتحة (اختيار صاحب التطبيق): نطبّقه مرة واحدة، ويبقى الداكن متاحاً في الإعدادات
+if (!store.get("uiV2", false)) { settings.theme = "light"; store.set("settings", settings); store.set("uiV2", true); }
 function applyLook() {
   document.documentElement.style.fontSize = settings.fontPx + "px";
   const sysLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
@@ -399,16 +462,23 @@ function render() {
 
   const nx = findNext(now);
   const mins = Math.max(0, Math.ceil((nx.time - now) / 60000));
-  $("next").innerHTML = `<div class="lbl">الإقامة القادمة</div>
-    <div class="pr">${nx.prayer.name}</div>
-    <div class="tm">${fmt12(nx.prayer.iqama)}</div>
-    <div class="in">${arDuration(mins)}</div>`;
-  $("list").innerHTML = todayPrayers(now).map((p, i) => {
-    // بعد العشاء: الإقامة القادمة هي فجر الغد، فنميّز الفجر بدل تبهيت كل الصلوات
-    const nextIdx = nx.index === -1 ? 0 : nx.index;
-    const cls = i === nextIdx ? "active" : (nx.index !== -1 && i < nx.index ? "past" : "");
-    return `<div class="row ${cls}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
+  // شريط التقدم: كم مضى من الوقت بين الإقامة السابقة والقادمة
+  const today = todayPrayers(now);
+  let prev;
+  if (nx.index > 0) prev = toDate(today[nx.index - 1].iqama, now);
+  else if (nx.index === -1) prev = toDate(today[today.length - 1].iqama, now);
+  else { const y = new Date(now); y.setDate(now.getDate() - 1); const yl = todayPrayers(y); prev = toDate(yl[yl.length - 1].iqama, y); }
+  const pct = Math.max(2, Math.min(100, Math.round((now - prev) / Math.max(1, nx.time - prev) * 100)));
+  // بعد العشاء: الإقامة القادمة هي فجر الغد، فنكبّر الفجر بدل تبهيت كل الصلوات
+  const nextIdx = nx.index === -1 ? 0 : nx.index;
+  $("list").innerHTML = today.map((p, i) => {
+    if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span>
+      <div class="cd"><span>الإقامة القادمة${nx.index === -1 ? " (غداً)" : ""}</span><span>${arDuration(mins)}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    const cls = nx.index !== -1 && i < nx.index ? "past" : "";
+    return `<div class="pit ${cls}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
   }).join("");
+  $("jumuahLine").textContent = now.getDay() === 5 ? "" : `الجمعة ${fmt12(cfg.jumuah)}`;
 }
 
 // ---------- المساجد ----------
@@ -1161,7 +1231,7 @@ async function scheduleAll() {
     if (!settings.on) {
       await Alarm.cancelAll();
       $("notifyStatus").textContent = "التنبيه متوقف.";
-      $("settingsSummary").textContent = "⚙ الإعدادات (التنبيه متوقف)";
+      $("settingsSummary").textContent = "الإعدادات (التنبيه متوقف)";
       try { await scheduleAdhkarReminders(); } catch {}
       return;
     }
@@ -1177,7 +1247,7 @@ async function scheduleAll() {
       $("settingsBox").open = true;
       $("notifyStatus").textContent = "سيرنّ الصوت، لكن الإشعار المكتوب لن يظهر لأنك لم تسمح بالإشعارات. فعّلها من إعدادات الجوال ← التطبيقات ← أوقات الإقامة ← الإشعارات.";
     }
-    $("settingsSummary").textContent = "⚙ الإعدادات";
+    $("settingsSummary").textContent = "الإعدادات";
     try {
       const exact = await Notif.checkExactNotificationSetting();
       $("exactBtn").hidden = exact.exact_alarm === "granted";
@@ -1349,7 +1419,29 @@ function closeAdhkar() { $("adhkarView").hidden = true; }
 document.querySelectorAll(".adhkarBtn[data-sec]").forEach(b => { b.onclick = () => openAdhkar(b.dataset.sec); });
 $("adhkarBack").onclick = () => history.back();
 // زر الرجوع في الجوال يغلق صفحة الأذكار بدل إغلاق التطبيق
-window.addEventListener("popstate", () => { closeAdhkar(); closeSheet(); closeKahf(); });
+window.addEventListener("popstate", () => {
+  const overlay = !$("adhkarView").hidden || !$("sheet").hidden || !$("kahfView").hidden;
+  closeAdhkar(); closeSheet(); closeKahf();
+  if (!overlay && tab !== "home") showTab("home", false);
+});
+// ---------- الشريط السفلي: الرئيسية، المساجد، الأذكار، الإعدادات ----------
+let tab = "home";
+function showTab(t, push = true) {
+  if (t === "mosques") { openSheet(); return; }
+  tab = t;
+  for (const [k, id] of [["home", "pgHome"], ["adhkar", "pgAdhkar"], ["settings", "pgSettings"]]) $(id).hidden = k !== t;
+  document.querySelectorAll("#bnav button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  window.scrollTo(0, 0);
+  if (push && t !== "home") history.pushState({ tab: t }, "");
+}
+$("bnav").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.tab === tab) return;
+  if (b.dataset.tab === "mosques") return showTab("mosques");
+  if (b.dataset.tab === "home") return history.back();               // يرجع من الصفحة المفتوحة إلى الرئيسية
+  if (tab !== "home") { showTab(b.dataset.tab, false); history.replaceState({ tab: b.dataset.tab }, ""); return; }
+  showTab(b.dataset.tab);
+});
 
 // ---------- سورة الكهف (رواية ورش عن نافع، نص وخط مجمع الملك فهد) ----------
 // السورة كاملة في صفحة واحدة تُمرَّر، ويُحفظ موضع القراءة
