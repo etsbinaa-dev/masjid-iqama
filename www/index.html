@@ -70,7 +70,7 @@
   #adhkarView { position:fixed; inset:0; background:var(--bg); overflow:hidden; z-index:10; display:flex; flex-direction:column;
                 padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
   .adhkarHead { position:sticky; top:0; background:var(--bg); display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid var(--card); }
-  .adhkarHead h2 { margin:0; font-size:1.2rem; color:var(--accent); }
+  .adhkarHead h2 { margin:0; font-family:"Amiri",serif; font-size:1.45rem; font-weight:700; color:var(--text); }
   .adhkarHead small { color:var(--muted); }
   #adhkarView[hidden] { display:none; }
   .pager { flex:1; min-height:0; display:flex; flex-direction:column; gap:12px; padding:12px 16px; box-sizing:border-box; }
@@ -148,6 +148,18 @@
   .mrow .tag { display:inline-block; color:var(--accent); font-size:.75rem; border:1px solid var(--accent); border-radius:999px; padding:0 8px; margin-inline-start:6px; }
   .mrow .edit { padding:6px 10px; font-size:.9rem; white-space:nowrap; }
   .bigBtn { width:100%; padding:12px; font-size:1.05rem; }
+  /* الزر الأهم في الصفحة ممتلئ، والباقي خفيف */
+  .primary { background:var(--accent); color:var(--on-accent); border-color:var(--accent); font-weight:700; }
+  .primary:disabled { opacity:.35; }
+  .soft { border-color:var(--hair); color:var(--muted); }
+  .textBtn { border:none; padding:6px 4px; }
+  .zoom button { border:none; background:var(--bg); color:var(--accent); }
+  .counter { border-width:2.5px; }
+  .actRow { display:flex; gap:8px; }
+  .actRow button { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 4px; font-size:.85rem;
+                   background:var(--card); border:none; border-radius:14px; color:var(--accent); }
+  .actRow button .si { width:1.4rem; height:1.4rem; }
+  .actRow button.primary { background:var(--accent); color:var(--on-accent); }
   .mrow .fav { border:none; padding:4px; font-size:1.35rem; line-height:1; color:var(--muted); }
   .mrow .fav.on { color:var(--accent); }
   .mSearch { width:100%; box-sizing:border-box; padding:10px 14px; font-size:1rem; border-radius:12px; border:1px solid var(--hair);
@@ -183,6 +195,7 @@
   .band .where { color:inherit; opacity:.85; }
   .band .whereGo { color:var(--gold1); }
   .band .bgLoc { color:var(--gold1); border-color:var(--gold1); margin:8px 0 0; }
+  .plist { display:flex; flex-direction:column; gap:8px; }
   #list.plist { display:flex; flex-direction:column; gap:8px; background:none; border-radius:0; padding:0; }
   .pit { display:flex; justify-content:space-between; align-items:center; padding:13px 18px; border-radius:16px; background:var(--card);
          font-size:1.08rem; box-shadow:0 1px 6px rgba(0,0,0,.04); }
@@ -353,7 +366,7 @@
   <button data-tab="home" class="on"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></span>الرئيسية</button>
   <button data-tab="mosques"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>المساجد</button>
   <button data-tab="adhkar"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6"/></svg></span>الأذكار</button>
-  <button data-tab="settings"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span>الإعدادات</button>
+  <button data-tab="settings"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>الإعدادات</button>
 </nav>
 
 <div id="sheet" hidden>
@@ -369,7 +382,7 @@
   <div class="adhkarHead">
     <button class="backBtn" id="adhkarBack"><svg class="si" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>رجوع</button>
     <div style="text-align:center"><h2 id="adhkarTitle">أذكار المساء</h2><small id="adhkarProgress"></small></div>
-    <button id="adhkarReset">إعادة</button>
+    <button class="textBtn" id="adhkarReset">إعادة</button>
   </div>
   <div class="pager">
     <div class="dhikr" id="dhikrCard">
@@ -382,8 +395,8 @@
       <div class="hint">اضغط على الذكر للعدّ</div>
     </div>
     <div class="nav">
-      <button id="dhikrPrev">السابق</button>
-      <button id="dhikrNext">التالي</button>
+      <button class="soft" id="dhikrPrev">السابق</button>
+      <button class="primary" id="dhikrNext">التالي</button>
     </div>
   </div>
 </div>
@@ -917,20 +930,18 @@ function renderMosquePage(id) {
   const isMine = current && current.id === m.id;
   $("sheetTitle").textContent = m.name;
   $("sheetBody").innerHTML = `
-    <div class="next">
-      <div class="lbl">${d !== null ? "على بعد " + fmtDist(d) + " · " : ""}الإقامة القادمة</div>
-      <div class="pr">${nextP.name}</div>
-      <div class="tm">${fmt12(nextP.iqama)}</div>
-      <div class="in">${arDuration(Math.max(0, Math.ceil((nextT - now) / 60000)))}</div>
+    ${d !== null ? `<div class="subline"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> على بعد ${fmtDist(d)} منك</div>` : ""}
+    <div class="plist">${list.map((p, i) => i === nextI
+      ? `<div class="pit next"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span>
+         <div class="cd"><span>الإقامة القادمة</span><span>${arDuration(Math.max(0, Math.ceil((nextT - now) / 60000)))}</span></div></div>`
+      : `<div class="pit ${nextI > i && toDate(p.iqama, now) < now ? "past" : ""}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`).join("")}</div>
+    ${now.getDay() === 5 ? "" : `<div class="subline"><span>الجمعة ${fmt12(m.jumuah)}</span></div>`}
+    <div class="actRow">
+      ${hasPos(m) ? `<button class="primary" id="mpGo"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>الطريق</button>` : ""}
+      <button id="mpShare"><svg class="si" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>مشاركة</button>
+      ${isMine ? "" : `<button id="mpChoose"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>اجعله مسجدي</button>`}
     </div>
-    <div id="mpList" style="background:var(--card);border-radius:18px;padding:4px 0">
-      ${list.map((p, i) => `<div class="row ${i === nextI ? "active" : ""}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`).join("")}
-      ${now.getDay() === 5 ? "" : `<div class="row"><span class="n">الجمعة</span><span class="t">${fmt12(m.jumuah)}</span></div>`}
-    </div>
-    ${hasPos(m) ? '<button class="updateBar" id="mpGo">🧭 الطريق إلى المسجد</button>' : ""}
-    <button class="bigBtn" id="mpShare">📤 مشاركة الأوقات على واتساب</button>
-    ${isMine ? '<div class="form"><div class="msg">هذا مسجدك الحالي، وتنبيهاتك منه.</div></div>'
-             : '<button class="bigBtn" id="mpChoose">اجعله مسجدي (التنبيهات منه)</button>'}`;
+    ${isMine ? '<div class="form"><div class="msg">هذا مسجدك الحالي، وتنبيهاتك منه.</div></div>' : ""}`;
   if ($("mpGo")) $("mpGo").onclick = () => openDirections(m);
   $("mpShare").onclick = () => shareMosque(m);
   if ($("mpChoose")) $("mpChoose").onclick = () => chooseMosque({ mode: "fixed", id: m.id });
@@ -962,7 +973,7 @@ function renderSheet() {
       <div class="sub">يختار التطبيق أقرب مسجد كلما فتحته</div></div></div>
     <input class="mSearch" id="mSearch" type="search" placeholder="🔍 ابحث عن مسجد بالاسم" autocomplete="off">
     <div id="mList" style="display:flex;flex-direction:column;gap:10px"></div>
-    <button class="bigBtn" id="addHere">+ أضف هذا المسجد (موقعي الحالي)</button>
+    <button class="bigBtn soft" id="addHere">+ أضف مسجداً في موقعي الحالي</button>
     <div class="form"><div class="msg" id="sheetMsg"></div></div>`;
   $("mSearch").addEventListener("input", renderMosqueList);
   renderMosqueList();
@@ -1055,7 +1066,7 @@ function renderEdit(id, newPos) {
         value="${m && hasPos(m) ? m.lat + "," + m.lng : (newPos ? newPos.lat.toFixed(6) + "," + newPos.lng.toFixed(6) : "")}"></label>
       <button class="bigBtn" id="fHere" type="button">📍 استعمل موقعي الحالي</button>` : ""}
     <label>${admin ? "انشر للجميع مباشرة (مشرف)" : "شارك مع الجميع (بعد المراجعة)"}<input type="checkbox" id="fShare" checked></label>
-    <button class="bigBtn" id="fSave">حفظ</button>
+    <button class="bigBtn primary" id="fSave">حفظ</button>
     ${!isNew && m.edited ? '<button class="bigBtn" id="fReset">الرجوع للأوقات الأصلية</button>' : ""}
     ${!isNew && m.mine ? '<button class="bigBtn danger" id="fDelete">حذف هذا المسجد</button>' : ""}
     ${!isNew && !m.mine && admin ? '<button class="bigBtn danger" id="fAdminDelete">🗑 حذف المسجد عند الجميع (مشرف)</button>' : ""}
