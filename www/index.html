@@ -358,6 +358,7 @@
     <div class="updated" id="updated"></div>
     <div class="updated" id="version"></div>
     <div class="updated" id="otaStatus"></div>
+    <button class="linkBtn" id="checkUpdBtn" style="color:var(--accent)">البحث عن تحديث الآن</button>
     <button class="linkBtn" id="adminBtn">🔐 دخول المشرف</button>
     </div>
   </div>
@@ -1673,7 +1674,11 @@ async function checkUpdate() {
       }
       step = "تجهيز التحديث";
       await Updater.next({ id: bundle.id });   // يُطبَّق حين يُغلق التطبيق أو يُرسَل للخلفية
-      otaStatus(`التحديث ${latest} جاهز — أغلق التطبيق وافتحه`);
+      otaStatus(`التحديث ${latest} جاهز`);
+      // أو فوراً بضغطة على الشريط
+      readyBundle = bundle.id;
+      $("updateBar").textContent = `تحديث جديد جاهز (${latest}) — اضغط لتطبيقه الآن`;
+      $("updateBar").hidden = false;
       return;
     }
     // يحتاج نظاماً داخلياً أحدث: تنزيل ملف التطبيق
@@ -1685,7 +1690,12 @@ async function checkUpdate() {
   }
 }
 // يفتح رابط التحميل في المتصفح، ثم يفتح الشخص الملف ويضغط "تثبيت"
-$("updateBar").onclick = () => { window.location.href = APK_URL; };
+let readyBundle = null;
+$("updateBar").onclick = async () => {
+  if (readyBundle && Updater) { try { await Updater.set({ id: readyBundle }); return; } catch {} }   // يعيد تحميل التطبيق بالنسخة الجديدة
+  window.location.href = APK_URL;
+};
+$("checkUpdBtn").onclick = () => { otaStatus("جارٍ البحث عن تحديث…"); lastUpdateCheck = Date.now(); checkUpdate(); };
 
 showUpdated();
 applyMosque(false);
@@ -1702,7 +1712,7 @@ let lastUpdateCheck = Date.now();
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
   refreshMosques(); locate(); refreshBgLoc(); loadPending();
-  if (Date.now() - lastUpdateCheck > 10 * 60 * 1000) { lastUpdateCheck = Date.now(); checkUpdate(); }
+  if (Date.now() - lastUpdateCheck > 2 * 60 * 1000) { lastUpdateCheck = Date.now(); checkUpdate(); }
 });
 </script>
 </body>
