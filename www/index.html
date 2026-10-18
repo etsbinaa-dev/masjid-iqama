@@ -208,6 +208,7 @@
   .pit.next .cd { width:100%; display:flex; justify-content:space-between; font-size:.85rem; margin-top:2px; }
   .pit.next .bar { width:100%; height:4px; border-radius:9px; background:rgba(255,255,255,.35); margin-top:8px; overflow:hidden; }
   .pit.next .bar i { display:block; height:100%; background:rgba(27,18,5,.38); border-radius:9px; }
+  .pit .n .az { display:block; font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif; font-size:.72rem; font-weight:400; opacity:.75; margin-top:2px; }
   .subline { display:flex; justify-content:space-between; align-items:center; font-size:.85rem; color:var(--muted); }
   .page[hidden] { display:none; }
   .pageTitle { font-family:"Amiri",serif; font-size:1.7rem; font-weight:700; margin:18px 0 4px; }
@@ -313,6 +314,14 @@
     </label>
     <div class="chipsLabel">التنبيه قبل كل إقامة:</div>
     <div class="prRows" id="prayerRows"></div>
+    <label for="travelSel">وضع السفر
+      <select id="travelSel">
+        <option value="auto">تلقائي (أبعد من 10 كم)</option>
+        <option value="off">مُطفأ</option>
+      </select>
+    </label>
+    <div class="hint2">في السفر: أوقات الأذان لموقعك، والإقامة بعده بهذه الدقائق (تقريبية):</div>
+    <div class="prRows" id="travelRows"></div>
     <label for="soundSel">صوت التنبيه
       <select id="soundSel">
         <option value="hayya">حي على الصلاة</option>
@@ -462,6 +471,8 @@ if (settings.hijriAdj === undefined) settings.hijriAdj = 0;
 if (!settings.sound) settings.sound = "hayya";
 if (settings.fridayRemind === undefined) settings.fridayRemind = true;
 if (!settings.fontPx) settings.fontPx = 16;
+if (!settings.travel) settings.travel = "auto";
+if (!settings.travelOff) settings.travelOff = { fajr: 20, dhuhr: 15, asr: 15, maghrib: 5, isha: 15 };
 if (!settings.theme) settings.theme = "dark";
 // حجم الخط والمظهر يُطبَّقان فوراً قبل أول رسم
 // التصميم الجديد بألوان فاتحة (اختيار صاحب التطبيق): نطبّقه مرة واحدة، ويبقى الداكن متاحاً في الإعدادات
@@ -536,11 +547,12 @@ function render() {
   // بعد العشاء: الإقامة القادمة هي فجر الغد، فنكبّر الفجر بدل تبهيت كل الصلوات
   const nextIdx = nx.index === -1 ? 0 : nx.index;
   $("list").innerHTML = today.map((p, i) => {
-    if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span>
+    const az = p => p.adhan ? `<small class="az">الأذان ${fmt12(p.adhan)}</small>` : "";
+    if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}${az(p)}</span><span class="t">${fmt12(p.iqama)}</span>
       <div class="cd"><span>الإقامة القادمة${nx.index === -1 ? " (غداً)" : ""}</span><span>${arDuration(mins)}</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div></div>`;
     const cls = nx.index !== -1 && i < nx.index ? "past" : "";
-    return `<div class="pit ${cls}"><span class="n">${p.name}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
+    return `<div class="pit ${cls}"><span class="n">${p.name}${az(p)}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
   }).join("");
   $("jumuahLine").textContent = now.getDay() === 5 ? "" : `الجمعة ${fmt12(cfg.jumuah)}`;
 }
@@ -589,6 +601,38 @@ function sunsetMin(date, lat, lng) {
   const UT = ((T - lngHour) % 24 + 24) % 24;
   return ((Math.round(UT * 60) - date.getTimezoneOffset()) % 1440 + 1440) % 1440;
 }
+// ---------- وضع السفر: أوقات الصلاة لموقعك بالحساب الفلكي ----------
+// رابطة العالم الإسلامي (الفجر 18°، العشاء 17°)، والعصر بظل المثل (المذهب المالكي)، والظهر بعد الزوال بدقيقتين
+function prayerTimesFor(date, lat, lng) {
+  const rad = Math.PI / 180, y = date.getFullYear(), mo = date.getMonth(), d = date.getDate();
+  const jd = Date.UTC(y, mo, d, 12) / 864e5 + 2440587.5, T = (jd - 2451545) / 36525;
+  const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
+  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T), e = 0.016708634 - T * 0.000042037;
+  const C = Math.sin(M * rad) * (1.914602 - T * 0.004817) + Math.sin(2 * M * rad) * 0.019993 + Math.sin(3 * M * rad) * 0.000289;
+  const om = 125.04 - 1934.136 * T, lam = L0 + C - 0.00569 - 0.00478 * Math.sin(om * rad);
+  const eps = 23 + (26 + (21.448 - T * 46.815) / 60) / 60 + 0.00256 * Math.cos(om * rad);
+  const dec = Math.asin(Math.sin(eps * rad) * Math.sin(lam * rad)) / rad;
+  const yy = Math.tan(eps / 2 * rad) ** 2;
+  const eot = 4 / rad * (yy * Math.sin(2 * L0 * rad) - 2 * e * Math.sin(M * rad) + 4 * e * yy * Math.sin(M * rad) * Math.cos(2 * L0 * rad)
+    - 0.5 * yy * yy * Math.sin(4 * L0 * rad) - 1.25 * e * e * Math.sin(2 * M * rad));
+  const noon = 720 - 4 * lng - eot - date.getTimezoneOffset();
+  const ha = alt => {   // الدقائق بين الزوال ووصول الشمس إلى الارتفاع alt
+    const c = (Math.sin(alt * rad) - Math.sin(lat * rad) * Math.sin(dec * rad)) / (Math.cos(lat * rad) * Math.cos(dec * rad));
+    return c < -1 || c > 1 ? null : Math.acos(c) / rad * 4;
+  };
+  const asrAlt = Math.atan(1 / (1 + Math.tan(Math.abs(lat - dec) * rad))) / rad;
+  const r = v => v === null ? null : ((Math.round(v) % 1440) + 1440) % 1440;
+  return { fajr: r(noon - ha(-18)), sunrise: r(noon - ha(-0.833)), dhuhr: r(noon + 2), asr: r(noon + ha(asrAlt)),
+           maghrib: r(noon + ha(-0.833)), isha: r(noon + ha(-17)) };
+}
+const TRAVEL_KM = 10;
+function travelMosque(pos, date = new Date()) {
+  const t = prayerTimesFor(date, pos.lat, pos.lng), off = settings.travelOff;
+  const mk = (name, k) => ({ name, adhan: hhmm(t[k]), iqama: hhmm(t[k] + off[k]) });
+  const prayers = [mk("الفجر", "fajr"), mk("الظهر", "dhuhr"), mk("العصر", "asr"),
+                   { ...mk("المغرب", "maghrib"), after_sunset: off.maghrib }, mk("العشاء", "isha")];
+  return { id: "__travel", name: "أوقات موقعك", lat: pos.lat, lng: pos.lng, note: "", prayers, jumuah: prayers[1].iqama, travel: true };
+}
 const hhmm = t => `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 // إقامة المغرب لتاريخ معيّن: الغروب + الدقائق إن كان المسجد يتبع الغروب، وإلا الوقت الثابت
 function maghribOn(m, date) {
@@ -627,6 +671,8 @@ function pickMosque() {
       const d = distKm(here, m);
       if (!best || d < best.d) best = { m, d };
     }
+    // بعيد عن كل المساجد المسجّلة: وضع السفر (أوقات محسوبة لموقعك)
+    if (settings.travel !== "off" && (!best || best.d > TRAVEL_KM)) return { m: travelMosque(here), why: "travel", d: best ? best.d : null };
     if (best) return { m: best.m, why: "near", d: best.d };
   }
   const last = list.find(x => x.id === store.get("lastMosque", null));
@@ -641,6 +687,7 @@ function applyMosque(reschedule = true) {
   store.set("lastMosque", current.id);
   $("whereText").textContent =
     currentWhy === "near" ? (currentDist > 5 ? `أقرب مسجد مسجّل على بعد ${fmtDist(currentDist)}` : `الأقرب إليك · ${fmtDist(currentDist)}`) :
+    currentWhy === "travel" ? "أنت مسافر · الأذان لموقعك والإقامة تقريبية" :
     currentWhy === "fixed" ? "اخترته يدوياً" : "اضغط على اسم المسجد لاختيار مسجدك";
   renderNearest();
   // نعيد الضبط أيضاً إن تغيّر الوضع (يدوي/تلقائي) أو أوقات/مواقع المساجد، لأن الفحص قبل الصلاة يعتمد عليها
@@ -659,8 +706,8 @@ function renderNearest() {
     if (!nearest || d < nearest.d) nearest = { m, d };
   }
   // إن كان الأقرب هو المسجد المعروض فلا داعي لتكرار اسمه؛ الطريق إليه بجانب سطر المسجد
-  $("nearBtn").hidden = !!(nearest && current && nearest.m.id === current.id);
-  $("whereGo").hidden = !(current && hasPos(current));
+  $("nearBtn").hidden = !!(nearest && current && nearest.m.id === current.id) || currentWhy === "travel";
+  $("whereGo").hidden = !(current && hasPos(current)) || currentWhy === "travel";
   if (nearest) {
     $("nearName").textContent = `${nearest.m.name} · ${fmtDist(nearest.d)}`;
     $("nearGo").textContent = "الطريق ‹";
@@ -1238,7 +1285,7 @@ function buildAlarms(c = cfg) {
 // ومعها "فحص" قبل كل صلاة بـ20 دقيقة (قبل أبكر إقامة بين المساجد) يأخذ الموقع ويضبط التنبيه على الأقرب،
 // وإن كان التنبيه مضبوطاً قبل الإقامة بأكثر من ذلك فالفحص قبل التنبيه بـ5 دقائق حتى يسبقه دائماً
 function buildAutoPlan(alarms) {
-  if (currentWhy === "fixed") return { variants: [], checks: [] };
+  if (currentWhy === "fixed" || currentWhy === "travel") return { variants: [], checks: [] };
   const variants = allMosques().filter(hasPos).map(m => ({
     lat: m.lat, lng: m.lng, alarms: buildAlarms({ mosqueName: m.name, prayers: m.prayers, jumuah: m.jumuah, lat: m.lat, lng: m.lng })
   }));
@@ -1330,6 +1377,11 @@ async function scheduleAll() {
 }
 
 // لكل صلاة: إيقاف، أو عدد الدقائق قبل الإقامة
+function renderTravelRows() {
+  const N = { fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" };
+  $("travelRows").innerHTML = Object.keys(N).map(k => `<label>${N[k]}<select data-tk="${k}">${[0, 5, 10, 15, 20, 25, 30].map(o =>
+    `<option value="${o}" ${o === settings.travelOff[k] ? "selected" : ""}>+${o} د</option>`).join("")}</select></label>`).join("");
+}
 function renderPrayerRows() {
   const opts = [0, 5, 10, 15, 20, 30, 45];
   $("prayerRows").innerHTML = PRAYER_KEYS.map(k => {
@@ -1358,6 +1410,13 @@ $("fontSel").value = String(settings.fontPx);
 $("fontSel").onchange = e => { settings.fontPx = Number(e.target.value); store.set("settings", settings); applyLook(); };
 $("themeSel").value = settings.theme;
 $("themeSel").onchange = e => { settings.theme = e.target.value; store.set("settings", settings); applyLook(); };
+renderTravelRows();
+$("travelSel").value = settings.travel;
+$("travelSel").onchange = e => { settings.travel = e.target.value; store.set("settings", settings); applyMosque(); scheduleAll(); };
+$("travelRows").addEventListener("change", e => {
+  const k = e.target.dataset.tk; if (!k) return;
+  settings.travelOff[k] = Number(e.target.value); store.set("settings", settings); applyMosque(); scheduleAll();
+});
 $("hijriAdj").value = String(settings.hijriAdj);
 $("hijriAdj").onchange = e => { settings.hijriAdj = Number(e.target.value); store.set("settings", settings); render(); };
 // الضغط على تذكير الأذكار يفتح القسم المناسب
