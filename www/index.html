@@ -187,14 +187,14 @@
   .band { background:var(--head); color:var(--headText); padding:16px 18px 18px; border-radius:0 0 26px 26px;
           background-image:radial-gradient(circle at 20px 20px,rgba(255,255,255,.06) 2px,transparent 3px),
                            radial-gradient(circle at 0 0,rgba(255,255,255,.045) 10px,transparent 11px);
-          background-size:40px 40px,40px 40px; display:flex; flex-direction:column; gap:2px; }
+          background-size:40px 40px,40px 40px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:2px; }
   .band .date { color:inherit; opacity:.75; font-size:.78rem; }
-  .band .mosqueSwitch { align-self:flex-start; padding:0; color:inherit; }
+  .band .mosqueSwitch { align-self:center; padding:0; color:inherit; }
   .band h1 { font-size:1.9rem; }
   .band .chev { color:var(--gold1); }
   .band .where { color:inherit; opacity:.85; }
   .band .whereGo { color:var(--gold1); }
-  .band .bgLoc { color:var(--gold1); border-color:var(--gold1); margin:8px 0 0; }
+  .band .bgLoc { color:var(--gold1); border-color:var(--gold1); margin:8px auto 0; }
   .plist { display:flex; flex-direction:column; gap:8px; }
   #list.plist { display:flex; flex-direction:column; gap:8px; background:none; border-radius:0; padding:0; }
   .pit { display:flex; justify-content:space-between; align-items:center; padding:13px 18px; border-radius:16px; background:var(--card);
@@ -613,7 +613,7 @@ function distKm(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-function fmtDist(km) { return km < 1 ? `${Math.round(km * 1000 / 10) * 10} م` : `${km.toFixed(1)} كم`; }
+function fmtDist(km) { return km < 1 ? `${Math.round(km * 1000 / 10) * 10} م` : km < 10 ? `${km.toFixed(1)} كم` : `${Math.round(km)} كم`; }
 function hasPos(m) { return typeof m.lat === "number" && typeof m.lng === "number"; }
 function pickMosque() {
   const list = allMosques();
@@ -640,7 +640,7 @@ function applyMosque(reschedule = true) {
   cfg = { mosqueName: current.name, note: current.note || "", prayers: current.prayers, jumuah: current.jumuah, lat: current.lat, lng: current.lng };
   store.set("lastMosque", current.id);
   $("whereText").textContent =
-    currentWhy === "near" ? `الأقرب إليك · ${fmtDist(currentDist)}` :
+    currentWhy === "near" ? (currentDist > 5 ? `أقرب مسجد مسجّل على بعد ${fmtDist(currentDist)}` : `الأقرب إليك · ${fmtDist(currentDist)}`) :
     currentWhy === "fixed" ? "اخترته يدوياً" : "اضغط على اسم المسجد لاختيار مسجدك";
   renderNearest();
   // نعيد الضبط أيضاً إن تغيّر الوضع (يدوي/تلقائي) أو أوقات/مواقع المساجد، لأن الفحص قبل الصلاة يعتمد عليها
