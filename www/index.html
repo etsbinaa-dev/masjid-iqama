@@ -640,25 +640,26 @@ function travelMosque(pos, date = new Date()) {
 }
 // اسم المكان (مثل «النباغية») من خدمة مجانية على الإنترنت، ويُحفظ لكل منطقة (~2 كم) فلا يُطلب مرة أخرى
 const placeKey = pos => `${pos.lat.toFixed(2)},${pos.lng.toFixed(2)}`;
-function placeNameFor(pos) { return (store.get("places", {}) || {})[placeKey(pos)] || ""; }
+function placeNameFor(pos) { return (store.get("places2", {}) || {})[placeKey(pos)] || ""; }
 let placeAsked = {};
 async function fetchPlaceName(pos) {
   const key = placeKey(pos);
   if (placeNameFor(pos) || placeAsked[key]) return;
   placeAsked[key] = true;
   let name = "";
+  // أولاً خرائط OpenStreetMap بدقة القرية/الحي (zoom=14)، ثم خدمة BigDataCloud (تعطي غالباً المقاطعة كبوتلميت)
   try {
+    const j = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&accept-language=ar&lat=${pos.lat}&lon=${pos.lng}`)).json();
+    const a = j.address || {};
+    name = a.village || a.hamlet || a.neighbourhood || a.suburb || a.town || a.city || a.municipality || "";
+  } catch {}
+  if (!name) try {
     const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.lat}&longitude=${pos.lng}&localityLanguage=ar`)).json();
     name = j.locality || j.city || "";
   } catch {}
-  if (!name) try {
-    const j = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=12&accept-language=ar&lat=${pos.lat}&lon=${pos.lng}`)).json();
-    const a = j.address || {};
-    name = a.village || a.town || a.city || a.municipality || a.county || a.state || "";
-  } catch {}
   if (!name) return;
-  const places = store.get("places", {}) || {};
-  places[key] = name; store.set("places", places);
+  const places = store.get("places2", {}) || {};
+  places[key] = name; store.set("places2", places);
   if (currentWhy === "travel") applyMosque();
 }
 const hhmm = t => `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
