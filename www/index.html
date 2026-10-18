@@ -208,6 +208,8 @@
   .pit.next .cd { width:100%; display:flex; justify-content:space-between; font-size:.85rem; margin-top:2px; }
   .pit.next .bar { width:100%; height:4px; border-radius:9px; background:rgba(255,255,255,.35); margin-top:8px; overflow:hidden; }
   .pit.next .bar i { display:block; height:100%; background:rgba(27,18,5,.38); border-radius:9px; }
+  .sunrise { text-align:center; color:var(--muted); font-size:.8rem; margin:-2px 0; }
+  .shareBtn[hidden] { display:none; }
   .pit .n .az { display:block; font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif; font-size:.72rem; font-weight:400; opacity:.75; margin-top:2px; }
   .subline { display:flex; justify-content:space-between; align-items:center; font-size:.85rem; color:var(--muted); }
   .page[hidden] { display:none; }
@@ -553,8 +555,9 @@ function render() {
       <div class="bar"><i style="width:${pct}%"></i></div></div>`;
     const cls = nx.index !== -1 && i < nx.index ? "past" : "";
     return `<div class="pit ${cls}"><span class="n">${p.name}${az(p)}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
-  }).join("");
-  $("jumuahLine").textContent = now.getDay() === 5 ? "" : `الجمعة ${fmt12(cfg.jumuah)}`;
+  }).map((h, i) => i === 0 && cfg.sunrise ? h + `<div class="sunrise">الشروق ${fmt12(cfg.sunrise)}</div>` : h).join("");
+  $("jumuahLine").textContent = cfg.travel ? "الأذان محسوب لموقعك، والإقامة تقريبية" : now.getDay() === 5 ? "" : `الجمعة ${fmt12(cfg.jumuah)}`;
+  $("shareMain").hidden = cfg.travel;
 }
 
 // ---------- المساجد ----------
@@ -631,7 +634,32 @@ function travelMosque(pos, date = new Date()) {
   const mk = (name, k) => ({ name, adhan: hhmm(t[k]), iqama: hhmm(t[k] + off[k]) });
   const prayers = [mk("الفجر", "fajr"), mk("الظهر", "dhuhr"), mk("العصر", "asr"),
                    { ...mk("المغرب", "maghrib"), after_sunset: off.maghrib }, mk("العشاء", "isha")];
-  return { id: "__travel", name: "أوقات موقعك", lat: pos.lat, lng: pos.lng, note: "", prayers, jumuah: prayers[1].iqama, travel: true };
+  const place = placeNameFor(pos);
+  return { id: "__travel", name: place || "أوقات موقعك", lat: pos.lat, lng: pos.lng, note: "", prayers, jumuah: prayers[1].iqama,
+           sunrise: hhmm(t.sunrise), travel: true };
+}
+// اسم المكان (مثل «النباغية») من خدمة مجانية على الإنترنت، ويُحفظ لكل منطقة (~2 كم) فلا يُطلب مرة أخرى
+const placeKey = pos => `${pos.lat.toFixed(2)},${pos.lng.toFixed(2)}`;
+function placeNameFor(pos) { return (store.get("places", {}) || {})[placeKey(pos)] || ""; }
+let placeAsked = {};
+async function fetchPlaceName(pos) {
+  const key = placeKey(pos);
+  if (placeNameFor(pos) || placeAsked[key]) return;
+  placeAsked[key] = true;
+  let name = "";
+  try {
+    const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.lat}&longitude=${pos.lng}&localityLanguage=ar`)).json();
+    name = j.locality || j.city || "";
+  } catch {}
+  if (!name) try {
+    const j = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=12&accept-language=ar&lat=${pos.lat}&lon=${pos.lng}`)).json();
+    const a = j.address || {};
+    name = a.village || a.town || a.city || a.municipality || a.county || a.state || "";
+  } catch {}
+  if (!name) return;
+  const places = store.get("places", {}) || {};
+  places[key] = name; store.set("places", places);
+  if (currentWhy === "travel") applyMosque();
 }
 const hhmm = t => `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 // إقامة المغرب لتاريخ معيّن: الغروب + الدقائق إن كان المسجد يتبع الغروب، وإلا الوقت الثابت
@@ -683,11 +711,13 @@ let lastSig = null;
 function applyMosque(reschedule = true) {
   const p = pickMosque();
   current = p.m; currentWhy = p.why; currentDist = p.d;
-  cfg = { mosqueName: current.name, note: current.note || "", prayers: current.prayers, jumuah: current.jumuah, lat: current.lat, lng: current.lng };
+  cfg = { mosqueName: current.name, note: current.note || "", prayers: current.prayers, jumuah: current.jumuah, lat: current.lat, lng: current.lng,
+          sunrise: current.sunrise || null, travel: !!current.travel };
+  if (current.travel) fetchPlaceName(current);
   store.set("lastMosque", current.id);
   $("whereText").textContent =
     currentWhy === "near" ? (currentDist > 5 ? `أقرب مسجد مسجّل على بعد ${fmtDist(currentDist)}` : `الأقرب إليك · ${fmtDist(currentDist)}`) :
-    currentWhy === "travel" ? "أنت مسافر · الأذان لموقعك والإقامة تقريبية" :
+    currentWhy === "travel" ? `أنت مسافر${currentDist ? " · على بعد " + fmtDist(currentDist) + " من أقرب مسجد مسجّل" : ""}` :
     currentWhy === "fixed" ? "اخترته يدوياً" : "اضغط على اسم المسجد لاختيار مسجدك";
   renderNearest();
   // نعيد الضبط أيضاً إن تغيّر الوضع (يدوي/تلقائي) أو أوقات/مواقع المساجد، لأن الفحص قبل الصلاة يعتمد عليها
