@@ -112,15 +112,18 @@ jobs:
         run: |
           N=$(cat NATIVE_LEVEL); V=${{ github.run_number }}
           R="https://github.com/${{ github.repository }}/releases/download/v$V"
-          echo "{\"version\": $V, \"native\": $N, \"web\": \"$R/web-n$N.zip\", \"apk\": \"$R/masjid-iqama.apk\"}" > latest.json
-          cat latest.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add latest.json
-          git commit -m "آخر نسخة: $V" || exit 0
-          # البناء يغيّر ملفات أخرى (رقم النسخة...) فنخزّنها مؤقتاً أثناء المزامنة
-          for i in 1 2 3; do
-            if git pull --rebase --autostash -q origin main && git push; then exit 0; fi
+          # نبدأ كل محاولة من آخر نسخة على GitHub (البناء انتهى، فلا نحتاج ملفاته المحلية)،
+          # ولا نكتب إلا إذا كان رقمنا أكبر من المنشور، فلا يتعارض بناءان متقاربان
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            CUR=$(python3 -c "import json;print(json.load(open('latest.json'))['version'])" 2>/dev/null || echo 0)
+            if [ "$CUR" -ge "$V" ]; then echo "المنشور ($CUR) أحدث أو مساوٍ"; exit 0; fi
+            echo "{\"version\": $V, \"native\": $N, \"web\": \"$R/web-n$N.zip\", \"apk\": \"$R/masjid-iqama.apk\"}" > latest.json
+            cat latest.json
+            git add latest.json && git commit -q -m "آخر نسخة: $V"
+            if git push -q origin HEAD:main; then exit 0; fi
             sleep 5
           done
           echo "::error::تعذّر نشر latest.json"; exit 1
