@@ -750,7 +750,10 @@ function getPosition() {
 }
 async function locate() {
   try {
-    here = await getPosition();
+    const pos = await getPosition();
+    // موقع رديء جداً (خطأ أكثر من 5 كم) لا نعتمده إن كان عندنا موقع أدق منه
+    if (pos.acc > 5000 && here && here.acc && here.acc < pos.acc) { $("accWarn").hidden = false; return; }
+    here = pos;
     store.set("lastPos", here);
     applyMosque();
     // موقع تقريبي (إذن "الموقع التقريبي" أو دون GPS): ننبّه لأن اختيار الأقرب قد يخطئ
