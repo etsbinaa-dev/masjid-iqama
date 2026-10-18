@@ -550,11 +550,12 @@ function render() {
   const nextIdx = nx.index === -1 ? 0 : nx.index;
   $("list").innerHTML = today.map((p, i) => {
     const az = p => p.adhan ? `<small class="az">الأذان ${fmt12(p.adhan)}</small>` : "";
-    if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}${az(p)}</span><span class="t">${fmt12(p.iqama)}</span>
-      <div class="cd"><span>الإقامة القادمة${nx.index === -1 ? " (غداً)" : ""}</span><span>${arDuration(mins)}</span></div>
+    const ap = cfg.travel ? "~" : "";   // في السفر: الإقامة تقريبية
+    if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span>
+      <div class="cd"><span>${cfg.travel ? "الإقامة التقريبية القادمة" : "الإقامة القادمة"}${nx.index === -1 ? " (غداً)" : ""}</span><span>${arDuration(mins)}</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div></div>`;
     const cls = nx.index !== -1 && i < nx.index ? "past" : "";
-    return `<div class="pit ${cls}"><span class="n">${p.name}${az(p)}</span><span class="t">${fmt12(p.iqama)}</span></div>`;
+    return `<div class="pit ${cls}"><span class="n">${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span></div>`;
   }).map((h, i) => i === 0 && cfg.sunrise ? h + `<div class="sunrise">الشروق ${fmt12(cfg.sunrise)}</div>` : h).join("");
   $("jumuahLine").textContent = cfg.travel ? "الأذان محسوب لموقعك، والإقامة تقريبية" : now.getDay() === 5 ? "" : `الجمعة ${fmt12(cfg.jumuah)}`;
   $("shareMain").hidden = cfg.travel;
@@ -715,6 +716,9 @@ function applyMosque(reschedule = true) {
   cfg = { mosqueName: current.name, note: current.note || "", prayers: current.prayers, jumuah: current.jumuah, lat: current.lat, lng: current.lng,
           sunrise: current.sunrise || null, travel: !!current.travel };
   if (current.travel) fetchPlaceName(current);
+  const ic = document.querySelector("#mosquesBtn .si");
+  if (ic) ic.innerHTML = current.travel ? '<path d="M12 6v12M6 12h12"/>' : '<path d="M6 9l6 6 6-6"/>';
+  $("mosquesBtn").setAttribute("aria-label", current.travel ? "أضف مسجداً هنا" : "تغيير المسجد");
   store.set("lastMosque", current.id);
   $("whereText").textContent =
     currentWhy === "near" ? (currentDist > 5 ? `أقرب مسجد مسجّل على بعد ${fmtDist(currentDist)}` : `الأقرب إليك · ${fmtDist(currentDist)}`) :
@@ -1259,7 +1263,7 @@ function renderEdit(id, newPos) {
     applyMosque(); backToList();
   };
 }
-$("mosquesBtn").onclick = openSheet;
+$("mosquesBtn").onclick = () => currentWhy === "travel" && here ? openEdit(null, here) : openSheet();
 $("shareMain").onclick = () => current && shareMosque(current);
 $("sheetHome").onclick = () => history.back();
 $("sheetBack").onclick = () => history.back();
