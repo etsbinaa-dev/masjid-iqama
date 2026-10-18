@@ -752,7 +752,10 @@ async function locate() {
   try {
     const pos = await getPosition();
     // موقع رديء جداً (خطأ أكثر من 5 كم) لا نعتمده إن كان عندنا موقع أدق منه
-    if (pos.acc > 5000 && here && here.acc && here.acc < pos.acc) { $("accWarn").hidden = false; return; }
+    if (pos.acc > 5000 && here && here.acc && here.acc < pos.acc) {
+      $("accWarn").textContent = "تعذّر تحديد موقعك بدقة الآن، فأبقينا آخر موقع دقيق. فعّل GPS و«الموقع الدقيق».";
+      $("accWarn").hidden = false; return;
+    }
     here = pos;
     store.set("lastPos", here);
     applyMosque();
