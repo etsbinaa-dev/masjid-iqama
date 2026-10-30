@@ -272,6 +272,14 @@
   .mtimes span { background:var(--bg); border-radius:8px; padding:4px 0; font-size:.88rem; font-variant-numeric:tabular-nums; }
   .mtimes small { display:block; color:var(--muted); font-size:.68rem; }
   .mrow.auto { flex-direction:row; align-items:center; }
+  .mrow.auto .info { flex:1; }
+  .radio { width:22px; height:22px; border-radius:50%; border:2px solid var(--muted); flex:none; position:relative; }
+  .mrow.sel .radio { border-color:var(--accent); }
+  .mrow.sel .radio::after { content:""; position:absolute; inset:3px; border-radius:50%; background:var(--accent); }
+  .mrow .tag.on { background:var(--accent); color:#fff; }
+  .prRows label:last-child:nth-child(odd) { grid-column:1 / -1; }
+  .prRows[hidden] { display:none; }
+  .moreBtn { border:none; background:none; color:var(--accent); font-size:.85rem; padding:2px 4px 6px; align-self:flex-start; justify-self:start; }
   .mrow.sel { outline:1.5px solid var(--accent); }
   /* الإعدادات في مجموعات */
   .grpTitle { color:var(--accent); font-size:.85rem; font-weight:700; margin:10px 4px -4px; }
@@ -322,8 +330,11 @@
     <label for="notifyOn">تفعيل التنبيه
       <input type="checkbox" id="notifyOn">
     </label>
-    <div class="hint2" style="margin:0 4px">التنبيه قبل كل إقامة بـ:</div>
-    <div class="prRows" id="prayerRows"></div>
+    <label for="allMin">التنبيه قبل الإقامة
+      <select id="allMin"></select>
+    </label>
+    <button class="moreBtn" id="customBtn">تخصيص لكل صلاة ‹</button>
+    <div class="prRows" id="prayerRows" hidden></div>
     <label for="soundSel">صوت التنبيه
       <select id="soundSel">
         <option value="hayya">حي على الصلاة</option>
@@ -341,8 +352,9 @@
       </select>
     </label>
     <div id="travelBox">
-      <div class="hint2" style="margin:0 4px 8px">الإقامة بعد الأذان في السفر (تقريبية):</div>
-      <div class="prRows" id="travelRows"></div>
+      <div class="hint2" style="margin:0 4px 4px" id="travelSum"></div>
+      <button class="moreBtn" id="travelEdit">تعديل دقائق الإقامة في السفر ‹</button>
+      <div class="prRows" id="travelRows" hidden></div>
     </div>
     <div class="grpTitle">التذكيرات</div>
     <label for="adhkarRemind">تذكير بأذكار الصباح والمساء
@@ -378,7 +390,6 @@
     </label>
     <div class="grpTitle">حول التطبيق</div>
     <div class="updated" id="updated"></div>
-    <div class="updated" id="version"></div>
     <div class="updated" id="otaStatus"></div>
     <button class="linkBtn" id="checkUpdBtn" style="color:var(--accent)">البحث عن تحديث الآن</button>
     <button class="linkBtn" id="adminBtn">دخول المشرف</button>
@@ -750,6 +761,8 @@ function applyMosque(reschedule = true) {
 }
 // زر "أقرب مسجد إليك الآن": أقرب مسجد لموقع الجوال (حتى لو اخترت مسجدك يدوياً)، والضغط يفتح الطريق إليه في الخرائط
 let nearest = null;
+// اسم قصير: «مسجد قباء (الدهاه)» ← «قباء»
+function shortName(n) { return String(n || "").replace(/^مسجد\s+/, "").replace(/\s*\(.*?\)\s*/g, " ").trim() || n; }
 function renderNearest() {
   nearest = null;
   if (here) for (const m of allMosques()) if (hasPos(m)) {
@@ -759,6 +772,7 @@ function renderNearest() {
   // إن كان الأقرب هو المسجد المعروض فلا داعي لتكرار اسمه؛ الطريق إليه بجانب سطر المسجد
   $("nearBtn").hidden = !!(nearest && current && nearest.m.id === current.id) || currentWhy === "travel";
   $("whereGo").hidden = !(current && hasPos(current)) || currentWhy === "travel";
+  if (current) $("whereGo").innerHTML = '· <svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg> طريق ' + escapeHtml(shortName(current.name));
   if (nearest) {
     $("nearName").textContent = `${nearest.m.name} · ${fmtDist(nearest.d)}`;
     $("nearGo").textContent = "الطريق ‹";
@@ -1079,7 +1093,7 @@ function renderSheet() {
   body.innerHTML = `
     <div class="mrow auto ${choice.mode === "auto" ? "sel" : ""}" data-auto="1">
       <div class="info"><div class="nm"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> تلقائي: الأقرب إليّ</div>
-      <div class="sub">يختار التطبيق أقرب مسجد كلما فتحته</div></div></div>
+      <div class="sub">${choice.mode === "auto" ? "مُفعّل · " : ""}يختار التطبيق أقرب مسجد كلما فتحته</div></div><span class="radio"></span></div>
     <input class="mSearch" id="mSearch" type="search" placeholder="ابحث عن مسجد بالاسم" autocomplete="off">
     <div id="mList" style="display:flex;flex-direction:column;gap:10px"></div>
     <button class="bigBtn soft" id="addHere">+ أضف مسجداً في موقعي الحالي</button>
@@ -1093,17 +1107,19 @@ function renderMosqueList() {
     .sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
   const t12 = v => fmt12(v).replace(/ [صم]$/, "");
   const isSel = m => choice.mode === "fixed" && choice.id === m.id;
-  const PN = ["الفجر", "الظهر", "العصر", "المغرب", "العشاء"];
+  // يوم الجمعة نعرض وقت الجمعة مكان الظهر
+  const fri = new Date().getDay() === 5;
+  const PN = ["الفجر", fri ? "الجمعة" : "الظهر", "العصر", "المغرب", "العشاء"];
   const row = ({ m, d }) => `
       <div class="mrow ${isSel(m) ? "sel" : ""}" data-id="${escapeHtml(m.id)}">
         <div class="mtop">
           <button class="fav ${favs.includes(m.id) ? "on" : ""}" data-fav="${escapeHtml(m.id)}" aria-label="مفضّل"><svg class="si" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></button>
-          <div class="nm">${escapeHtml(m.name)}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}</div>
+          <div class="nm">${escapeHtml(m.name)}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}${isSel(m) ? '<span class="tag on">مسجدك</span>' : ""}</div>
           ${d !== null ? `<span class="dist">${fmtDist(d)}</span>` : ""}
           ${hasPos(m) ? `<button class="ib" data-go="${escapeHtml(m.id)}" aria-label="الطريق"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></button>` : ""}
           <button class="ib" data-edit="${escapeHtml(m.id)}" aria-label="تعديل"><svg class="si" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
         </div>
-        <div class="mtimes">${m.prayers.map((p, i) => `<span><small>${PN[i]}</small>${t12(p.iqama)}</span>`).join("")}</div>
+        <div class="mtimes">${m.prayers.map((p, i) => `<span><small>${PN[i]}</small>${t12(fri && i === 1 && m.jumuah ? m.jumuah : p.iqama)}</span>`).join("")}</div>
       </div>`;
   let html = "";
   if (q) {
@@ -1432,7 +1448,9 @@ function renderTravelRows() {
   const N = { fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" };
   $("travelRows").innerHTML = Object.keys(N).map(k => `<label>${N[k]}<select data-tk="${k}">${[0, 5, 10, 15, 20, 25, 30].map(o =>
     `<option value="${o}" ${o === settings.travelOff[k] ? "selected" : ""}>+${o} د</option>`).join("")}</select></label>`).join("");
+  $("travelSum").textContent = "الإقامة بعد الأذان (تقريبية): " + Object.keys(N).map(k => `${N[k]} ${settings.travelOff[k]}`).join(" · ") + " د";
 }
+$("travelEdit").onclick = () => { const r = $("travelRows"); r.hidden = !r.hidden; $("travelEdit").textContent = r.hidden ? "تعديل دقائق الإقامة في السفر ‹" : "إخفاء ⌄"; };
 function renderPrayerRows() {
   const opts = [0, 5, 10, 15, 20, 30, 45];
   $("prayerRows").innerHTML = PRAYER_KEYS.map(k => {
@@ -1440,13 +1458,27 @@ function renderPrayerRows() {
     return `<label for="pm_${k}">${PRAYER_NAMES[k]}<select id="pm_${k}" data-k="${k}">${opts.map(o =>
       `<option value="${o}" ${o === cur ? "selected" : ""}>${o ? o + " د" : "إيقاف"}</option>`).join("")}</select></label>`;
   }).join("");
+  // قيمة واحدة لكل الصلوات، أو «مخصّص» إن اختلفت
+  const vals = PRAYER_KEYS.map(k => settings.prayers[k] ? settings.perMin[k] : 0);
+  const same = vals.every(v => v === vals[0]);
+  $("allMin").innerHTML = (same ? "" : '<option value="" selected>مخصّص لكل صلاة</option>') + opts.map(o =>
+    `<option value="${o}" ${same && o === vals[0] ? "selected" : ""}>${o ? o + " دقائق لكل الصلوات" : "إيقاف للكل"}</option>`).join("");
+  if (!same) showCustom(true);
 }
+function showCustom(on) { $("prayerRows").hidden = !on; $("customBtn").textContent = on ? "إخفاء ⌄" : "تخصيص لكل صلاة ‹"; }
+$("customBtn").onclick = () => showCustom($("prayerRows").hidden);
+$("allMin").addEventListener("change", e => {
+  if (e.target.value === "") return;
+  const v = Number(e.target.value);
+  for (const k of PRAYER_KEYS) { settings.prayers[k] = v > 0; if (v > 0) settings.perMin[k] = v; }
+  store.set("settings", settings); renderPrayerRows(); scheduleAll();
+});
 $("prayerRows").addEventListener("change", e => {
   const k = e.target.dataset && e.target.dataset.k; if (!k) return;
   const v = Number(e.target.value);
   settings.prayers[k] = v > 0;
   if (v > 0) settings.perMin[k] = v;
-  store.set("settings", settings); scheduleAll();
+  store.set("settings", settings); renderPrayerRows(); scheduleAll();
 });
 renderPrayerRows();
 $("notifyOn").checked = settings.on;
@@ -1467,7 +1499,7 @@ $("travelBox").hidden = settings.travel === "off";
 $("travelSel").onchange = e => { settings.travel = e.target.value; store.set("settings", settings); $("travelBox").hidden = settings.travel === "off"; applyMosque(); scheduleAll(); };
 $("travelRows").addEventListener("change", e => {
   const k = e.target.dataset.tk; if (!k) return;
-  settings.travelOff[k] = Number(e.target.value); store.set("settings", settings); applyMosque(); scheduleAll();
+  settings.travelOff[k] = Number(e.target.value); store.set("settings", settings); renderTravelRows(); applyMosque(); scheduleAll();
 });
 $("hijriAdj").value = String(settings.hijriAdj);
 $("hijriAdj").onchange = e => { settings.hijriAdj = Number(e.target.value); store.set("settings", settings); render(); };
@@ -1771,13 +1803,15 @@ async function latestRelease() {
   return { version: parseInt(String(rel.tag_name || "").replace(/\D/g, ""), 10),
            native: web ? parseInt(web.m[1], 10) : 99, webUrl: web ? web.a.browser_download_url : null };
 }
+// رقم النسخة للعرض: 69 ← 0.69، و100 ← 1.0، و101 ← 1.1 ...
+function fmtVer(v) { return v < 100 ? `0.${v}` : `${Math.floor(v / 100)}.${v % 100}`; }
 // سطر صغير يبيّن حالة التحديث تحت رقم النسخة (ويساعد على معرفة سبب أي مشكلة)
 function otaStatus(t) { $("otaStatus").textContent = t; }
 async function checkUpdate() {
   let step = "قراءة رقم النسخة";
   try {
     appVersion = (await (await fetch("version.json", { cache: "no-store" })).json()).version || 0;
-    if (appVersion) $("version").textContent = `النسخة ${appVersion}`;
+    if (appVersion) $("checkUpdBtn").textContent = `النسخة ${fmtVer(appVersion)} · البحث عن تحديث`;
     if (!appVersion || !Alarm) return;            // لا تحديث خارج تطبيق الجوال
     step = "السؤال عن آخر نسخة";
     const info = await latestRelease();
