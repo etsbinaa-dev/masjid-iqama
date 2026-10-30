@@ -53,6 +53,8 @@
   .nearBtn b { font-size:1.05rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .nearBtn .go { color:var(--accent); font-weight:700; white-space:nowrap; }
   .note { color:var(--muted); font-size:.8rem; white-space:pre-line; }
+  .band .bandNote { color:inherit; opacity:.7; font-size:.78rem; margin-top:2px; }
+  .whereGo.shareTop[hidden] { display:none; }
   .note:empty { display:none; }
   .settings { background:transparent; border-radius:14px; border:1px solid var(--hair); }
   .settings summary { padding:10px 14px; cursor:pointer; color:var(--accent); font-size:.95rem; }
@@ -208,7 +210,9 @@
   .pit.next .n { font-family:"Amiri",serif; font-size:1.9rem; font-weight:700; line-height:1.2; }
   .pit.next .t { font-size:1.7rem; font-weight:700; }
   .pit.next .cd { width:100%; display:flex; justify-content:space-between; font-size:.85rem; margin-top:2px; }
-  .pit.next .bar { width:100%; height:4px; border-radius:9px; background:rgba(255,255,255,.35); margin-top:8px; overflow:hidden; }
+  .pit.next .bar { width:100%; height:4px; border-radius:9px; background:rgba(255,255,255,.35); margin-top:8px; overflow:hidden;
+                   display:flex; direction:rtl; justify-content:flex-start; }
+  .pit.next .bar i { flex:none; }
   .pit.next .bar i { display:block; height:100%; background:rgba(27,18,5,.38); border-radius:9px; }
   .sunrise { text-align:center; color:var(--muted); font-size:.8rem; margin:-2px 0; }
   .shareBtn[hidden] { display:none; }
@@ -276,15 +280,15 @@
   <div class="band">
     <div class="date" id="date"></div>
     <button class="mosqueSwitch" id="mosquesBtn" aria-label="تغيير المسجد"><h1 id="name"></h1><svg class="si" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="where"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> <span id="whereText"></span><button class="whereGo" id="whereGo" hidden>· <svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg> الطريق</button></div>
+    <div class="where"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> <span id="whereText"></span><button class="whereGo" id="whereGo" hidden>· <svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg> الطريق</button><span id="shareWrap"><button class="whereGo shareTop" id="shareMain">· <svg class="si" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg> مشاركة</button></span></div>
+    <div class="note bandNote" id="note"></div>
     <div class="where" id="accWarn" style="color:var(--gold1);margin-top:4px" hidden></div>
     <button class="bgLoc" id="bgLocBtn" hidden>📍 ليتغيّر المسجد تلقائياً وأنت خارج التطبيق: اسمح بالموقع «طوال الوقت»</button>
   </div>
   <button class="updateBar" id="updateBar" hidden></button>
   <button class="updateBar adminBar" id="adminBar" hidden></button>
   <div class="plist" id="list"></div>
-  <div class="subline"><span id="jumuahLine"></span><button class="shareBtn" id="shareMain"><svg class="si" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg> مشاركة</button></div>
-  <div class="note" id="note"></div>
+  <div class="subline" style="justify-content:center"><span id="jumuahLine"></span></div>
   <button class="smart" id="smartCard" hidden><span id="smartIc"></span><span class="tx"><b id="smartTitle"></b><small id="smartSub"></small></span><span class="go"><svg class="si" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></button>
   <button class="nearBtn" id="nearBtn">
     <span class="ic" style="color:var(--accent)"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>
@@ -543,6 +547,9 @@ function render() {
   const mins = Math.max(0, Math.ceil((nx.time - now) / 60000));
   // شريط التقدم: كم مضى من الوقت بين الإقامة السابقة والقادمة
   const today = todayPrayers(now);
+  // بعد العشاء: نعرض صلوات الغد (فيها الجمعة إن كان الغد جمعة)
+  const tmr = new Date(now); tmr.setDate(now.getDate() + 1);
+  const shown = nx.index === -1 ? todayPrayers(tmr) : today;
   let prev;
   if (nx.index > 0) prev = toDate(today[nx.index - 1].iqama, now);
   else if (nx.index === -1) prev = toDate(today[today.length - 1].iqama, now);
@@ -550,7 +557,7 @@ function render() {
   const pct = Math.max(2, Math.min(100, Math.round((now - prev) / Math.max(1, nx.time - prev) * 100)));
   // بعد العشاء: الإقامة القادمة هي فجر الغد، فنكبّر الفجر بدل تبهيت كل الصلوات
   const nextIdx = nx.index === -1 ? 0 : nx.index;
-  $("list").innerHTML = today.map((p, i) => {
+  $("list").innerHTML = shown.map((p, i) => {
     const az = p => p.adhan ? `<small class="az">الأذان ${fmt12(p.adhan)}</small>` : "";
     const ap = cfg.travel ? "~" : "";   // في السفر: الإقامة تقريبية
     if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span>
@@ -559,7 +566,9 @@ function render() {
     const cls = nx.index !== -1 && i < nx.index ? "past" : "";
     return `<div class="pit ${cls}"><span class="n">${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span></div>`;
   }).map((h, i) => i === 0 && cfg.sunrise ? h + `<div class="sunrise">الشروق ${fmt12(cfg.sunrise)}</div>` : h).join("");
-  $("jumuahLine").textContent = cfg.travel ? "الأذان محسوب لموقعك، والإقامة تقريبية" : now.getDay() === 5 ? "" : `الجمعة ${fmt12(cfg.jumuah)}`;
+  const listDay = nx.index === -1 ? tmr : now;
+  $("jumuahLine").textContent = cfg.travel ? "الأذان محسوب لموقعك، والإقامة تقريبية"
+    : listDay.getDay() === 5 ? "" : `${nx.index === -1 ? "أوقات الغد · " : ""}الجمعة ${fmt12(cfg.jumuah)}`;
   $("shareMain").hidden = cfg.travel;
 }
 
