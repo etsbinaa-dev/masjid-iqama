@@ -90,6 +90,7 @@
   .dhikr.done .counter { background:var(--accent); color:var(--on-accent); }
   .dhikr:active .counter { transform:scale(.96); }
   .hint { text-align:center; color:var(--muted); font-size:.8rem; }
+  .hint[hidden] { display:none; }
   .nav { display:flex; gap:10px; }
   .nav button { flex:1; padding:12px; font-size:1.05rem; }
   .nav button:disabled { opacity:.35; }
@@ -405,7 +406,7 @@
       </div>
       <div class="txt" id="dhikrText"></div>
       <div class="counter" id="dhikrCounter"><b id="dhikrLeft"></b><span id="dhikrLabel"></span></div>
-      <div class="hint">اضغط على الذكر للعدّ</div>
+      <div class="hint" id="dhikrHint">اضغط على الذكر للعدّ</div>
     </div>
     <div class="nav">
       <button class="soft" id="dhikrPrev">السابق</button>
@@ -1489,22 +1490,30 @@ function saveDone() { store.set("adhkarDone_" + section, { day: todayKey(), coun
 let page = 0;
 function leftOf(i) { return adhkar[i].n - Math.min(done[i] || 0, adhkar[i].n); }
 function renderAdhkar() {
+  $("dhikrHint").hidden = !!store.get("dhikrHintSeen", false);
   if ((store.get("adhkarDone_" + section, {}) || {}).day !== todayKey()) done = {};
   if (!adhkar.length) { $("dhikrText").textContent = "تعذّر تحميل الأذكار."; return; }
   page = Math.max(0, Math.min(page, adhkar.length - 1));
   const d = adhkar[page], left = leftOf(page);
-  $("dhikrTitle").textContent = `${page + 1} من ${adhkar.length}${d.t ? " · " + d.t : ""}`;
+  $("dhikrTitle").textContent = d.t || "";
   $("dhikrText").innerHTML = formatDhikr(d.x);
   fitText();
 
   $("dhikrLeft").textContent = left ? left : "✓";
   $("dhikrLabel").textContent = left ? (d.n > 1 ? "متبقي" : "مرة") : "تمّ";
   $("dhikrCard").classList.toggle("done", !left);
+  // حلقة تمتلئ مع العدّ للأذكار المكرّرة
+  const ring = $("dhikrCounter");
+  if (d.n > 1 && left) {
+    const pct = Math.round((d.n - left) / d.n * 100);
+    ring.style.border = "none";
+    ring.style.background = `radial-gradient(closest-side, var(--card) 88%, transparent 89% 100%), conic-gradient(var(--accent) ${pct}%, var(--hair) 0)`;
+  } else { ring.style.border = ""; ring.style.background = ""; }
   $("dhikrPrev").disabled = page === 0;
   $("dhikrNext").textContent = page === adhkar.length - 1 ? "انتهت الأذكار" : "التالي";
   $("dhikrNext").disabled = page === adhkar.length - 1;
   const finished = adhkar.filter((_, i) => !leftOf(i)).length;
-  $("adhkarProgress").textContent = `أكملت ${finished} من ${adhkar.length}`;
+  $("adhkarProgress").textContent = `${page + 1} من ${adhkar.length} · أكملت ${finished}`;
 }
 // تنسيق النص: كل سطر في فقرة، البسملة والاستعاذة بالذهبي، وأرقام الآيات بالذهبي
 const LEAD_LINES = ["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ"];
@@ -1548,6 +1557,7 @@ function goTo(i) {
 let advanceTimer = null;
 $("dhikrCard").addEventListener("click", () => {
   if (!leftOf(page)) return;
+  if (!store.get("dhikrHintSeen", false)) { store.set("dhikrHintSeen", true); $("dhikrHint").hidden = true; }
   done[page] = (done[page] || 0) + 1; saveDone(); renderAdhkar();
   const finishedNow = !leftOf(page);
   try { navigator.vibrate && navigator.vibrate(finishedNow ? 60 : 15); } catch {}
