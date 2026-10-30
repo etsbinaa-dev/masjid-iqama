@@ -1,3 +1,5 @@
 warsh.woff2: خط ورش (KFGQPC Warsh Uthmanic, v10) من مجمع الملك فهد لطباعة المصحف الشريف
 https://qurancomplex.gov.sa/en/techquran/dev/ — يُستعمل كما هو دون تعديل
 ونص سورة الكهف في kahf.json من نفس المصدر (رواية ورش عن نافع).
+
+hafs.woff2: خط مصحف المدينة (KFGQPC Hafs Uthmanic, v18) من مجمع الملك فهد لطباعة المصحف الشريف — للأذكار، يُستعمل كما هو دون تعديل.
