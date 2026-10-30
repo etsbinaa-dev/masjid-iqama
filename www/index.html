@@ -166,8 +166,9 @@
   .actRow button.primary { background:var(--accent); color:var(--on-accent); }
   .mrow .fav { border:none; padding:4px; font-size:1.35rem; line-height:1; color:var(--muted); }
   .mrow .fav.on { color:var(--accent); }
-  .mSearch { width:100%; box-sizing:border-box; padding:10px 14px; font-size:1rem; border-radius:12px; border:1px solid var(--hair);
-             background:var(--card); color:var(--text); font-family:inherit; }
+  .mSearch { background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8781f' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E") no-repeat right 12px center / 18px;
+             padding-right:38px !important; width:100%; box-sizing:border-box; padding:10px 14px; font-size:1rem; border-radius:12px; border:1px solid var(--hair);
+             color:var(--text); font-family:inherit; }
   .mSection { color:var(--muted); font-size:.8rem; margin:4px 4px -4px; }
   .mEmpty { color:var(--muted); font-size:.9rem; text-align:center; padding:8px; }
   .form label { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--card); border-radius:10px; padding:10px 14px; font-size:1.05rem; }
@@ -178,8 +179,9 @@
   :root[data-theme="light"] select, :root[data-theme="light"] .form input { background:#edf1ec; color:var(--text); border:1px solid var(--hair); }
   :root[data-theme="light"] .danger { color:#b3442f; border-color:#b3442f; }
   .prRows { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .prRows label { background:var(--bg); border-radius:10px; padding:6px 10px; }
-  .prRows select { font-size:.9rem; padding:4px; }
+  .prRows label { background:var(--card); border-radius:12px; padding:8px 12px; display:flex; flex-direction:column; align-items:stretch; gap:6px; font-size:.95rem; }
+  .prRows select { font-size:.95rem; padding:6px; width:100%; }
+  #travelBox[hidden] { display:none; }
   .hint2 { color:var(--muted); font-size:.8rem; margin-top:-6px; }
   .shareBtn { background:none; border:none; color:var(--accent); font-size:.9rem; padding:4px; }
   /* ===== التصميم الجديد: رأس أخضر بزخرفة، قائمة تكبر فيها الصلاة القادمة، وشريط ثابت في الأسفل ===== */
@@ -320,16 +322,8 @@
     <label for="notifyOn">تفعيل التنبيه
       <input type="checkbox" id="notifyOn">
     </label>
-    <div class="chipsLabel">التنبيه قبل كل إقامة:</div>
+    <div class="hint2" style="margin:0 4px">التنبيه قبل كل إقامة بـ:</div>
     <div class="prRows" id="prayerRows"></div>
-    <label for="travelSel">وضع السفر
-      <select id="travelSel">
-        <option value="auto">تلقائي (أبعد من 10 كم)</option>
-        <option value="off">مُطفأ</option>
-      </select>
-    </label>
-    <div class="hint2">في السفر: أوقات الأذان لموقعك، والإقامة بعده بهذه الدقائق (تقريبية):</div>
-    <div class="prRows" id="travelRows"></div>
     <label for="soundSel">صوت التنبيه
       <select id="soundSel">
         <option value="hayya">حي على الصلاة</option>
@@ -339,6 +333,17 @@
     </label>
     <div class="status" id="notifyStatus"></div>
     <button id="exactBtn" hidden>اسمح بالتنبيه في الوقت الدقيق</button>
+    <div class="grpTitle">السفر</div>
+    <label for="travelSel">وضع السفر
+      <select id="travelSel">
+        <option value="auto">تلقائي (أبعد من 10 كم)</option>
+        <option value="off">مُطفأ</option>
+      </select>
+    </label>
+    <div id="travelBox">
+      <div class="hint2" style="margin:0 4px 8px">الإقامة بعد الأذان في السفر (تقريبية):</div>
+      <div class="prRows" id="travelRows"></div>
+    </div>
     <div class="grpTitle">التذكيرات</div>
     <label for="adhkarRemind">تذكير بأذكار الصباح والمساء
       <input type="checkbox" id="adhkarRemind">
@@ -376,7 +381,7 @@
     <div class="updated" id="version"></div>
     <div class="updated" id="otaStatus"></div>
     <button class="linkBtn" id="checkUpdBtn" style="color:var(--accent)">البحث عن تحديث الآن</button>
-    <button class="linkBtn" id="adminBtn">🔐 دخول المشرف</button>
+    <button class="linkBtn" id="adminBtn">دخول المشرف</button>
     </div>
   </div>
 </div>
@@ -935,7 +940,7 @@ async function loadPending() {
   renderAdmin();
 }
 function renderAdmin() {
-  $("adminBtn").textContent = admin ? `🔐 المشرف: ${admin.email} · الاقتراحات · خروج` : "🔐 دخول المشرف";
+  $("adminBtn").innerHTML = '<svg class="si" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> ' + (admin ? `المشرف: ${escapeHtml(admin.email)} · الاقتراحات` : "دخول المشرف");
   const n = pendingSubs.length;
   $("adminBar").hidden = !admin || !n;
   $("adminBar").textContent = n === 1 ? "📥 اقتراح جديد للمراجعة" : n === 2 ? "📥 اقتراحان جديدان للمراجعة" : `📥 ${n} اقتراحات جديدة للمراجعة`;
@@ -1075,7 +1080,7 @@ function renderSheet() {
     <div class="mrow auto ${choice.mode === "auto" ? "sel" : ""}" data-auto="1">
       <div class="info"><div class="nm"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> تلقائي: الأقرب إليّ</div>
       <div class="sub">يختار التطبيق أقرب مسجد كلما فتحته</div></div></div>
-    <input class="mSearch" id="mSearch" type="search" placeholder="🔍 ابحث عن مسجد بالاسم" autocomplete="off">
+    <input class="mSearch" id="mSearch" type="search" placeholder="ابحث عن مسجد بالاسم" autocomplete="off">
     <div id="mList" style="display:flex;flex-direction:column;gap:10px"></div>
     <button class="bigBtn soft" id="addHere">+ أضف مسجداً في موقعي الحالي</button>
     <div class="form"><div class="msg" id="sheetMsg"></div></div>`;
@@ -1458,7 +1463,8 @@ $("themeSel").value = settings.theme;
 $("themeSel").onchange = e => { settings.theme = e.target.value; store.set("settings", settings); applyLook(); };
 renderTravelRows();
 $("travelSel").value = settings.travel;
-$("travelSel").onchange = e => { settings.travel = e.target.value; store.set("settings", settings); applyMosque(); scheduleAll(); };
+$("travelBox").hidden = settings.travel === "off";
+$("travelSel").onchange = e => { settings.travel = e.target.value; store.set("settings", settings); $("travelBox").hidden = settings.travel === "off"; applyMosque(); scheduleAll(); };
 $("travelRows").addEventListener("change", e => {
   const k = e.target.dataset.tk; if (!k) return;
   settings.travelOff[k] = Number(e.target.value); store.set("settings", settings); applyMosque(); scheduleAll();
