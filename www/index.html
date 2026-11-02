@@ -1425,9 +1425,10 @@ async function askPermission() {
 // ليشغّله التنبيه والتطبيق مغلق. يحتاج النظام الداخلي 5 أو أحدث
 const FAJR_ADHAN = "fajr_adhan.ogg";
 let fajrAdhanReady = false;
+// نسأل النظام الداخلي مباشرة: soundInfo موجودة فقط في النظام 5 وما بعده
 async function fajrAdhanAvailable() {
-  if (!Alarm || (await nativeLevel()) < 5) return false;
-  try { return (await fetch("sounds/" + FAJR_ADHAN, { method: "HEAD", cache: "no-store" })).ok; } catch { return false; }
+  if (!Alarm) return false;
+  try { await Alarm.soundInfo({ name: FAJR_ADHAN }); return true; } catch { return false; }
 }
 async function ensureFajrAdhan() {
   fajrAdhanReady = false;
