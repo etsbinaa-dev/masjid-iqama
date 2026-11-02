@@ -66,9 +66,16 @@ public class AlarmReceiver extends BroadcastReceiver {
             if (last != null && now - last < 60_000L) return;
             lastFired.put(a.optInt("id"), now);
         }
+        String sound = a.optString("sound", "hayya");
+        // صوت طويل من ملف (مثل الأذان كاملاً للفجر): تشغّله خدمة أمامية بإشعارها الخاص.
+        // إن لم يوجد الملف أو تعذّر بدء الخدمة نرجع إلى «حي على الصلاة»
+        if (sound.startsWith("file:")) {
+            if (AdhanService.start(c, sound.substring(5), a.optString("title"), a.optString("body"))) return;
+            sound = "hayya";
+        }
         showNotification(c, a);
         // الصوت المختار في الإعدادات: hayya (حي على الصلاة) أو chime (جرس) أو vibrate (اهتزاز فقط)
-        playSound(c, goAsync(), a.optString("sound", "hayya"));
+        playSound(c, goAsync(), sound);
     }
 
     private static Vibrator vibrator;
@@ -130,6 +137,7 @@ public class AlarmReceiver extends BroadcastReceiver {
 
     /** يوقف الصوت ويحرّر كل شيء. آمن للاستدعاء أكثر من مرة. */
     static synchronized void stopSound() {
+        AdhanService.stopNow();
         handler.removeCallbacksAndMessages(null);
         if (vibrator != null) {
             try {

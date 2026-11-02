@@ -43,6 +43,7 @@ public class IqamaAlarmPlugin extends Plugin {
             a.put("title", call.getString("title", "تجربة التنبيه"));
             a.put("body", call.getString("body", ""));
             a.put("repeat", false);
+            a.put("sound", call.getString("sound", "hayya"));
             long at = System.currentTimeMillis() + call.getInt("seconds", 5) * 1000L;
             IqamaAlarms.setAlarm(getContext(), a, at);
             call.resolve();
@@ -85,6 +86,43 @@ public class IqamaAlarmPlugin extends Plugin {
         } catch (Exception e) {
             call.reject(e.getMessage());
         }
+    }
+
+    /** يحفظ ملف صوت (من الواجهة، بصيغة base64) في مجلد sounds ليشغّله التنبيه والتطبيق مغلق. */
+    @PluginMethod
+    public void saveSound(PluginCall call) {
+        String name = call.getString("name", "");
+        String data = call.getString("data");
+        // اسم بسيط فقط (حروف وأرقام ونقطة وشرطة)، لا مسارات
+        if (data == null || !name.matches("[A-Za-z0-9_.-]{1,64}") || name.startsWith(".")) {
+            call.reject("bad sound");
+            return;
+        }
+        try {
+            java.io.File f = AdhanService.soundFile(getContext(), name);
+            java.io.File dir = f.getParentFile();
+            if (dir != null && !dir.exists() && !dir.mkdirs()) throw new java.io.IOException("mkdir");
+            java.io.File tmp = new java.io.File(dir, name + ".tmp");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
+                out.write(android.util.Base64.decode(data, android.util.Base64.DEFAULT));
+            }
+            if (!tmp.renameTo(f)) throw new java.io.IOException("rename");
+            JSObject r = new JSObject();
+            r.put("size", f.length());
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject(e.getMessage());
+        }
+    }
+
+    /** حجم ملف صوت محفوظ (0 إن لم يوجد)، لتعرف الواجهة هل تحتاج نسخه مرة أخرى. */
+    @PluginMethod
+    public void soundInfo(PluginCall call) {
+        String name = call.getString("name", "");
+        JSObject r = new JSObject();
+        java.io.File f = name.matches("[A-Za-z0-9_.-]{1,64}") ? AdhanService.soundFile(getContext(), name) : null;
+        r.put("size", f != null && f.exists() ? f.length() : 0);
+        call.resolve(r);
     }
 
     @PluginMethod
