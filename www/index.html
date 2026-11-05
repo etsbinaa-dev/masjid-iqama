@@ -412,6 +412,7 @@
     <div class="updated">مواقع بعض المساجد من خريطة © OpenStreetMap</div>
     <button class="linkBtn" id="checkUpdBtn" style="color:var(--accent)">البحث عن تحديث الآن</button>
     <button class="linkBtn" id="adminBtn">دخول المشرف</button>
+    <button class="linkBtn" id="osmImport" style="color:var(--accent)" hidden></button>
     </div>
   </div>
 </div>
@@ -1025,7 +1026,42 @@ function renderAdmin() {
   $("adminBar").hidden = !admin || !n;
   $("adminBar").textContent = n === 1 ? "📥 اقتراح جديد للمراجعة" : n === 2 ? "📥 اقتراحان جديدان للمراجعة" : `📥 ${n} اقتراحات جديدة للمراجعة`;
   if (!$("sheet").hidden && sheetView === "review") renderReview();
+  refreshOsmBtn();
 }
+// المشرف: استيراد مساجد خريطة OpenStreetMap (ملف osm_mosques.json مع التطبيق) إلى القاعدة بضغطة واحدة،
+// مرة واحدة فقط (لا يعيد مسجداً حذفه المشرف لاحقاً)، ودون الكتابة فوق مسجد موجود
+let osmList = null;
+async function refreshOsmBtn() {
+  const btn = $("osmImport");
+  if (!admin || store.get("osmImported", false)) { btn.hidden = true; return; }
+  try { osmList = osmList || await (await fetch("osm_mosques.json", { cache: "no-store" })).json(); } catch { btn.hidden = true; return; }
+  const have = new Set(baseMosques.map(m => m.id));
+  const missing = osmList.filter(m => !have.has(m.id));
+  btn.hidden = !missing.length;
+  btn.textContent = `🗺 استيراد ${missing.length} مسجداً من الخريطة (مشرف)`;
+}
+$("osmImport").onclick = async () => {
+  const btn = $("osmImport");
+  const have = new Set(baseMosques.map(m => m.id));
+  const missing = (osmList || []).filter(m => !have.has(m.id));
+  if (!missing.length || !confirm(`إضافة ${missing.length} مسجداً من الخريطة بأوقات تقريبية، فتظهر عند الجميع؟`)) return;
+  btn.disabled = true;
+  try {
+    const now = new Date().toISOString();
+    for (let i = 0; i < missing.length; i += 100) {
+      btn.textContent = `جارٍ الاستيراد… ${i}/${missing.length}`;
+      await adminFetch("/rest/v1/mosques?on_conflict=id", { method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+        body: JSON.stringify(missing.slice(i, i + 100).map(m => ({ ...m, updated_at: now }))) });
+    }
+    store.set("osmImported", true);
+    btn.textContent = `✅ أُضيف ${missing.length} مسجداً`;
+    await refreshMosques();
+  } catch (e) {
+    btn.textContent = "تعذّر الاستيراد: " + (e.message || e) + " — اضغط للمحاولة مرة أخرى";
+  }
+  btn.disabled = false;
+};
 function openAdminView(view) {
   sheetView = view;
   view === "login" ? renderLogin() : renderReview();
