@@ -629,7 +629,9 @@ function allMosques() {
     ...baseMosques.map(m => overrides[m.id] ? { ...m, ...overrides[m.id], edited: true } : m),
     ...myMosques.map(m => ({ ...m, mine: true }))
   ];
-  return list.map(m => withMaghrib(withApprox(m, list)));
+  // للتقريب نبحث فقط بين المساجد التي فيها وقت معروف واحد على الأقل (قليلة)، فيبقى سريعاً مع مئات المساجد
+  const known = list.filter(m => hasPos(m) && Array.isArray(m.prayers) && m.prayers.some(p => !p.approx));
+  return list.map(m => withMaghrib(withApprox(m, known)));
 }
 // ---------- الأوقات غير المعروفة ----------
 // صلاة عليها approx (أو الجمعة وعليها prayers[1].jumuah_approx) = لا يعرف من أضافها وقتها.
@@ -666,7 +668,6 @@ function withApprox(m, list) {
   }
   return { ...m, prayers, jumuah, jumApprox: unkJ };
 }
-const APPROX_PENALTY_KM = 0.7;
 // مسجد كل أوقاته تقريبية (مثل المساجد المأخوذة من الخريطة دون أوقات)
 const allApprox = m => !!(m && (m.prayers || []).every(p => p.approx));
 const hasApprox = m => !!(m && (m.jumApprox || (m.prayers || []).some(p => p.approx)));
@@ -785,12 +786,11 @@ function pickMosque() {
     if (m) return { m, why: "fixed", d: here && hasPos(m) ? distKm(here, m) : null };
   }
   if (here) {
-    // المسجد ذو الأوقات التقريبية يُحسب كأنه أبعد بـ700 م، فيفضَّل عليه مسجد موثّق قريب:
-    // مثلاً تقريبي على 100 م وموثّق على 400 م ← الموثّق
-    let best = null, bestScore = Infinity;
+    // أقرب مسجد بالمسافة، موثّقاً كان أو تقريبياً (اختيار صاحب التطبيق)
+    let best = null;
     for (const m of list) if (hasPos(m)) {
-      const d = distKm(here, m), score = d + (hasApprox(m) ? APPROX_PENALTY_KM : 0);
-      if (score < bestScore) { best = { m, d }; bestScore = score; }
+      const d = distKm(here, m);
+      if (!best || d < best.d) best = { m, d };
     }
     // بعيد عن كل المساجد المسجّلة: وضع السفر (أوقات محسوبة لموقعك)
     if (settings.travel !== "off" && (!best || best.d > TRAVEL_KM)) return { m: travelMosque(here), why: "travel", d: best ? best.d : null };
@@ -1460,8 +1460,11 @@ function buildAlarms(c = cfg) {
 // وإن كان التنبيه مضبوطاً قبل الإقامة بأكثر من ذلك فالفحص قبل التنبيه بـ5 دقائق حتى يسبقه دائماً
 function buildAutoPlan(alarms) {
   if (currentWhy === "fixed" || currentWhy === "travel") return { variants: [], checks: [] };
-  // التنبيه والتطبيق مغلق يختار الأقرب بالمسافة فقط، فلا نرسل له المساجد التي كل أوقاتها تقريبية
-  const variants = allMosques().filter(m => hasPos(m) && !allApprox(m)).map(m => ({
+  // التنبيه والتطبيق مغلق يختار الأقرب بالمسافة؛ نرسل له أقرب 80 مسجداً لآخر موقع (تكفي للتنقل داخل المدينة،
+  // وتتجدد كلما فُتح التطبيق) حتى لا تكبر البيانات مع مئات المساجد
+  const pool = allMosques().filter(hasPos);
+  if (here) pool.sort((a, b) => distKm(here, a) - distKm(here, b));
+  const variants = pool.slice(0, 80).map(m => ({
     lat: m.lat, lng: m.lng, alarms: buildAlarms({ mosqueName: m.name, prayers: m.prayers, jumuah: m.jumuah, jumApprox: m.jumApprox, lat: m.lat, lng: m.lng })
   }));
   if (variants.length < 2) return { variants: [], checks: [] };
