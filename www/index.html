@@ -307,7 +307,7 @@
   <button class="updateBar adminBar" id="adminBar" hidden></button>
   <div class="plist" id="list"></div>
   <div class="subline" style="justify-content:center"><span id="jumuahLine"></span></div>
-  <button class="approxHint" id="approxHint" hidden>~ أوقات تقريبية لم يُدخلها أحد بعد — هل تعرفها؟ أكملها ‹</button>
+  <button class="approxHint" id="approxHint" hidden>~ توقيت تقريبي غير رسمي — يمكنك تعديله ‹</button>
   <button class="smart" id="smartCard" hidden><span id="smartIc"></span><span class="tx"><b id="smartTitle"></b><small id="smartSub"></small></span><span class="go"><svg class="si" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></button>
   <button class="nearBtn" id="nearBtn">
     <span class="ic" style="color:var(--accent)"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>
@@ -409,6 +409,7 @@
     <div class="grpTitle">حول التطبيق</div>
     <div class="updated" id="updated"></div>
     <div class="updated" id="otaStatus"></div>
+    <div class="updated">مواقع بعض المساجد من خريطة © OpenStreetMap</div>
     <button class="linkBtn" id="checkUpdBtn" style="color:var(--accent)">البحث عن تحديث الآن</button>
     <button class="linkBtn" id="adminBtn">دخول المشرف</button>
     </div>
@@ -665,6 +666,9 @@ function withApprox(m, list) {
   }
   return { ...m, prayers, jumuah, jumApprox: unkJ };
 }
+const APPROX_PENALTY_KM = 0.7;
+// مسجد كل أوقاته تقريبية (مثل المساجد المأخوذة من الخريطة دون أوقات)
+const allApprox = m => !!(m && (m.prayers || []).every(p => p.approx));
 const hasApprox = m => !!(m && (m.jumApprox || (m.prayers || []).some(p => p.approx)));
 // ---------- المغرب حسب الغروب ----------
 function parsePosSafe(v) {
@@ -781,10 +785,12 @@ function pickMosque() {
     if (m) return { m, why: "fixed", d: here && hasPos(m) ? distKm(here, m) : null };
   }
   if (here) {
-    let best = null;
+    // المسجد ذو الأوقات التقريبية يُحسب كأنه أبعد بـ700 م، فيفضَّل عليه مسجد موثّق قريب:
+    // مثلاً تقريبي على 100 م وموثّق على 400 م ← الموثّق
+    let best = null, bestScore = Infinity;
     for (const m of list) if (hasPos(m)) {
-      const d = distKm(here, m);
-      if (!best || d < best.d) best = { m, d };
+      const d = distKm(here, m), score = d + (hasApprox(m) ? APPROX_PENALTY_KM : 0);
+      if (score < bestScore) { best = { m, d }; bestScore = score; }
     }
     // بعيد عن كل المساجد المسجّلة: وضع السفر (أوقات محسوبة لموقعك)
     if (settings.travel !== "off" && (!best || best.d > TRAVEL_KM)) return { m: travelMosque(here), why: "travel", d: best ? best.d : null };
@@ -1120,7 +1126,7 @@ function renderMosquePage(id) {
          <div class="cd"><span>الإقامة القادمة</span><span>${arDuration(Math.max(0, Math.ceil((nextT - now) / 60000)))}</span></div></div>`
       : `<div class="pit ${nextI > i && toDate(p.iqama, now) < now ? "past" : ""}"><span class="n">${p.name}</span><span class="t">${ap(p)}${fmt12(p.iqama)}</span></div>`).join("")}</div>
     ${now.getDay() === 5 ? "" : `<div class="subline"><span>الجمعة ${m.jumApprox ? "~" : ""}${fmt12(m.jumuah)}</span></div>`}
-    ${hasApprox(m) ? `<button class="approxHint" id="mpApprox">~ أوقات تقريبية — هل تعرفها؟ أكملها ‹</button>` : ""}
+    ${hasApprox(m) ? `<button class="approxHint" id="mpApprox">~ توقيت تقريبي غير رسمي — يمكنك تعديله ‹</button>` : ""}
     <div class="actRow">
       ${hasPos(m) ? `<button class="primary" id="mpGo"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>الطريق</button>` : ""}
       <button id="mpShare"><svg class="si" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>مشاركة</button>
@@ -1177,7 +1183,7 @@ function renderMosqueList() {
       <div class="mrow ${isSel(m) ? "sel" : ""}" data-id="${escapeHtml(m.id)}">
         <div class="mtop">
           <button class="fav ${favs.includes(m.id) ? "on" : ""}" data-fav="${escapeHtml(m.id)}" aria-label="مفضّل"><svg class="si" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></button>
-          <div class="nm">${escapeHtml(m.name)}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}${isSel(m) ? '<span class="tag on">مسجدك</span>' : ""}</div>
+          <div class="nm">${escapeHtml(m.name)}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}${allApprox(m) ? '<span class="tag">تقريبي</span>' : ""}${isSel(m) ? '<span class="tag on">مسجدك</span>' : ""}</div>
           ${d !== null ? `<span class="dist">${fmtDist(d)}</span>` : ""}
           ${hasPos(m) ? `<button class="ib" data-go="${escapeHtml(m.id)}" aria-label="الطريق"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></button>` : ""}
           <button class="ib" data-edit="${escapeHtml(m.id)}" aria-label="تعديل"><svg class="si" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
@@ -1454,7 +1460,8 @@ function buildAlarms(c = cfg) {
 // وإن كان التنبيه مضبوطاً قبل الإقامة بأكثر من ذلك فالفحص قبل التنبيه بـ5 دقائق حتى يسبقه دائماً
 function buildAutoPlan(alarms) {
   if (currentWhy === "fixed" || currentWhy === "travel") return { variants: [], checks: [] };
-  const variants = allMosques().filter(hasPos).map(m => ({
+  // التنبيه والتطبيق مغلق يختار الأقرب بالمسافة فقط، فلا نرسل له المساجد التي كل أوقاتها تقريبية
+  const variants = allMosques().filter(m => hasPos(m) && !allApprox(m)).map(m => ({
     lat: m.lat, lng: m.lng, alarms: buildAlarms({ mosqueName: m.name, prayers: m.prayers, jumuah: m.jumuah, jumApprox: m.jumApprox, lat: m.lat, lng: m.lng })
   }));
   if (variants.length < 2) return { variants: [], checks: [] };
