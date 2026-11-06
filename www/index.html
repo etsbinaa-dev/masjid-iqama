@@ -172,6 +172,12 @@
              padding-right:38px !important; width:100%; box-sizing:border-box; padding:10px 14px; font-size:1rem; border-radius:12px; border:1px solid var(--hair);
              color:var(--text); font-family:inherit; }
   .mSection { color:var(--muted); font-size:.8rem; margin:4px 4px -4px; }
+  .dGrp { display:flex; flex-direction:column; gap:10px; }
+  .dHead { display:flex; justify-content:space-between; align-items:center; width:100%; background:var(--card); border:1px solid var(--hair); border-radius:12px; padding:12px 14px; font-size:1.05rem; font-weight:700; color:var(--text); }
+  .dHead.open { border-color:var(--accent); }
+  .dHead small { color:var(--accent); font-weight:400; font-size:.8rem; }
+  .dHead .cnt { color:var(--muted); font-weight:400; font-size:.9rem; }
+  .dBody { display:flex; flex-direction:column; gap:10px; }
   .mEmpty { color:var(--muted); font-size:.9rem; text-align:center; padding:8px; }
   .form label { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--card); border-radius:10px; padding:10px 14px; font-size:1.05rem; }
   .form input { font-size:1.05rem; padding:6px; border-radius:8px; border:none; background:var(--text); color:var(--bg); }
@@ -805,7 +811,7 @@ let lastSig = null;
 function applyMosque(reschedule = true) {
   const p = pickMosque();
   current = p.m; currentWhy = p.why; currentDist = p.d;
-  cfg = { mosqueName: current.name, note: current.note || "", prayers: current.prayers, jumuah: current.jumuah, lat: current.lat, lng: current.lng,
+  cfg = { mosqueName: current.travel ? current.name : mosqueLabel(current), note: current.note || "", prayers: current.prayers, jumuah: current.jumuah, lat: current.lat, lng: current.lng,
           sunrise: current.sunrise || null, travel: !!current.travel, jumApprox: !!current.jumApprox };
   if (current.travel) fetchPlaceName(current);
   const ic = document.querySelector("#mosquesBtn .si");
@@ -839,7 +845,7 @@ function renderNearest() {
   $("whereGo").hidden = !(current && hasPos(current)) || currentWhy === "travel";
   if (current) $("whereGo").innerHTML = '· <svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg> طريق ' + escapeHtml(shortName(current.name));
   if (nearest) {
-    $("nearName").textContent = `${nearest.m.name} · ${fmtDist(nearest.d)}`;
+    $("nearName").textContent = `${mosqueLabel(nearest.m)} · ${fmtDist(nearest.d)}`;
     $("nearGo").textContent = "الطريق ‹";
   } else {
     $("nearName").textContent = here ? "لا توجد مساجد بمواقع معروفة" : "اضغط لتحديد موقعك";
@@ -1206,6 +1212,38 @@ function renderSheet() {
   $("mSearch").addEventListener("input", renderMosqueList);
   renderMosqueList();
 }
+// ---------- مقاطعات نواكشوط ----------
+// حدود المقاطعات التسع (مبسّطة) من خريطة © OpenStreetMap: [خط الطول، خط العرض]
+const DISTRICTS = [{"n":"لكصر","p":[[-15.97,18.0683],[-15.9652,18.0791],[-15.961,18.088],[-15.9604,18.0884],[-15.9535,18.0983],[-15.9529,18.099],[-15.9471,18.106],[-15.945,18.1086],[-15.9384,18.117],[-15.9437,18.1209],[-15.9445,18.1199],[-15.9469,18.1215],[-15.9519,18.1234],[-15.947,18.1769],[-15.9965,18.1767],[-15.9815,18.1383],[-15.9778,18.1265],[-15.9752,18.1192],[-15.9719,18.1111],[-15.9727,18.1072],[-15.9748,18.1043],[-15.9756,18.1002],[-15.9682,18.0988],[-15.9684,18.0979],[-15.968,18.0972],[-15.97,18.0866],[-15.9749,18.0874],[-15.976,18.0814],[-15.9764,18.0797],[-15.9769,18.0788],[-15.9774,18.0784],[-15.977,18.0777],[-15.9746,18.0773],[-15.9752,18.074],[-15.9755,18.0724],[-15.9755,18.0717],[-15.9755,18.0709],[-15.9748,18.0702],[-15.9741,18.0698],[-15.97,18.0683]]},{"n":"تفرغ زينة","p":[[-16.0282,18.1765],[-16.0448,18.1764],[-16.0447,18.1637],[-16.0446,18.1586],[-16.0446,18.1551],[-16.0445,18.1348],[-16.0444,18.1236],[-16.0443,18.0996],[-16.0285,18.0978],[-16.0269,18.0976],[-16.0259,18.0975],[-16.024,18.0973],[-16.0221,18.0973],[-16.0188,18.0972],[-16.0079,18.0899],[-16.0017,18.0857],[-16.0005,18.085],[-15.9992,18.0845],[-15.9983,18.0843],[-15.9971,18.0841],[-15.9955,18.0841],[-15.9939,18.0843],[-15.9902,18.0855],[-15.9863,18.0867],[-15.9859,18.0844],[-15.9853,18.0824],[-15.985,18.0815],[-15.9844,18.0806],[-15.9841,18.0802],[-15.9839,18.0797],[-15.9833,18.0788],[-15.983,18.0786],[-15.9821,18.0784],[-15.9771,18.0777],[-15.977,18.0777],[-15.9774,18.0784],[-15.9769,18.0788],[-15.9764,18.0797],[-15.976,18.0814],[-15.9749,18.0874],[-15.97,18.0866],[-15.968,18.0972],[-15.9684,18.0979],[-15.9682,18.0988],[-15.9756,18.1002],[-15.9748,18.1043],[-15.9727,18.1072],[-15.9719,18.1111],[-15.9752,18.1192],[-15.9778,18.1265],[-15.9815,18.1383],[-15.9965,18.1767],[-16.0282,18.1765]]},{"n":"السبخة","p":[[-16.0443,18.0996],[-16.0439,18.0509],[-16.0252,18.0549],[-16.0247,18.055],[-16.0113,18.058],[-15.9913,18.0702],[-15.9851,18.0741],[-15.9832,18.0755],[-15.9827,18.076],[-15.9823,18.0771],[-15.9821,18.0784],[-15.983,18.0786],[-15.9833,18.0788],[-15.9839,18.0797],[-15.9841,18.0802],[-15.9844,18.0806],[-15.985,18.0815],[-15.9853,18.0824],[-15.9859,18.0844],[-15.9863,18.0867],[-15.9902,18.0855],[-15.9939,18.0843],[-15.9955,18.0841],[-15.9971,18.0841],[-15.9983,18.0843],[-15.9992,18.0845],[-16.0005,18.085],[-16.0017,18.0857],[-16.0079,18.0899],[-16.0188,18.0972],[-16.0221,18.0973],[-16.024,18.0973],[-16.0259,18.0975],[-16.0269,18.0976],[-16.0285,18.0978],[-16.0443,18.0996]]},{"n":"عرفات","p":[[-15.97,18.0683],[-15.972,18.0636],[-15.9739,18.0594],[-15.975,18.0569],[-15.9754,18.0557],[-15.9756,18.0534],[-15.9754,18.0517],[-15.9744,18.0477],[-15.9733,18.0432],[-15.9724,18.0391],[-15.9723,18.0369],[-15.9726,18.0345],[-15.9731,18.0319],[-15.9647,18.0306],[-15.9645,18.0292],[-15.9602,18.0301],[-15.9488,18.0299],[-15.9453,18.0395],[-15.9427,18.047],[-15.9408,18.0502],[-15.9401,18.0519],[-15.9385,18.0566],[-15.9371,18.0616],[-15.9381,18.0621],[-15.9385,18.0623],[-15.9358,18.071],[-15.9652,18.0791],[-15.97,18.0683]]},{"n":"الميناء","p":[[-15.9821,18.0784],[-15.9823,18.0771],[-15.9827,18.076],[-15.9832,18.0755],[-15.9851,18.0741],[-15.9913,18.0702],[-16.0113,18.058],[-16.0247,18.055],[-16.0252,18.0549],[-16.0439,18.0509],[-16.0436,17.976],[-16.02,17.9762],[-15.9724,17.9765],[-15.9773,18.0051],[-15.9777,18.0081],[-15.9771,18.0118],[-15.9731,18.0319],[-15.9726,18.0345],[-15.9723,18.0369],[-15.9724,18.0391],[-15.9733,18.0432],[-15.9744,18.0477],[-15.9754,18.0517],[-15.9756,18.0534],[-15.9754,18.0557],[-15.975,18.0569],[-15.9739,18.0594],[-15.972,18.0636],[-15.97,18.0683],[-15.9741,18.0698],[-15.9748,18.0702],[-15.9755,18.0709],[-15.9755,18.0717],[-15.9755,18.0724],[-15.9752,18.074],[-15.9746,18.0773],[-15.977,18.0777],[-15.9771,18.0777],[-15.9821,18.0784]]},{"n":"الرياض","p":[[-15.9488,18.0299],[-15.9602,18.0301],[-15.9645,18.0292],[-15.9647,18.0306],[-15.9731,18.0319],[-15.9771,18.0118],[-15.9777,18.0081],[-15.9773,18.0051],[-15.9724,17.9765],[-15.8877,17.9769],[-15.8882,18.0303],[-15.9488,18.0299]]},{"n":"توجنين","p":[[-15.9488,18.0299],[-15.8882,18.0303],[-15.8885,18.092],[-15.8888,18.1416],[-15.9134,18.1088],[-15.9194,18.1009],[-15.9214,18.0983],[-15.9232,18.0963],[-15.9278,18.0923],[-15.9327,18.0873],[-15.935,18.0734],[-15.9358,18.071],[-15.9385,18.0623],[-15.9381,18.0621],[-15.9371,18.0616],[-15.9385,18.0566],[-15.9401,18.0519],[-15.9408,18.0502],[-15.9427,18.047],[-15.9453,18.0395],[-15.9488,18.0299]]},{"n":"دار النعيم","p":[[-15.9384,18.117],[-15.945,18.1086],[-15.9471,18.106],[-15.9529,18.099],[-15.9535,18.0983],[-15.9604,18.0884],[-15.961,18.088],[-15.9652,18.0791],[-15.9358,18.071],[-15.935,18.0734],[-15.9327,18.0873],[-15.9278,18.0923],[-15.9232,18.0963],[-15.9214,18.0983],[-15.9194,18.1009],[-15.9134,18.1088],[-15.8888,18.1416],[-15.9179,18.1414],[-15.9212,18.1383],[-15.9228,18.1366],[-15.9257,18.1332],[-15.9272,18.1312],[-15.9286,18.1297],[-15.9384,18.117]]},{"n":"تيارت","p":[[-15.9384,18.117],[-15.9286,18.1297],[-15.9272,18.1312],[-15.9257,18.1332],[-15.9228,18.1366],[-15.9212,18.1383],[-15.9179,18.1414],[-15.8934,18.1772],[-15.8949,18.1772],[-15.947,18.1769],[-15.9519,18.1234],[-15.9469,18.1215],[-15.9445,18.1199],[-15.9437,18.1209],[-15.9384,18.117]]}];
+function inPoly(x, y, ring) {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [x1, y1] = ring[i], [x2, y2] = ring[j];
+    if ((y1 > y) !== (y2 > y) && x < (x2 - x1) * (y - y1) / (y2 - y1) + x1) c = !c;
+  }
+  return c;
+}
+// مقاطعة موقع: داخل حدودها، أو أقرب مقاطعة إن كان قريباً من الحافة (حتى 5 كم)، وإلا «خارج نواكشوط»
+const districtCache = new Map();
+function districtOf(pos) {
+  if (!pos || !hasPos(pos)) return "غير محدد";
+  const key = pos.lat.toFixed(4) + "," + pos.lng.toFixed(4);
+  if (districtCache.has(key)) return districtCache.get(key);
+  let name = (DISTRICTS.find(d => inPoly(pos.lng, pos.lat, d.p)) || {}).n;
+  if (!name) {
+    let best = Infinity;
+    for (const d of DISTRICTS) for (const [x, y] of d.p) {
+      const km = distKm(pos, { lat: y, lng: x });
+      if (km < best) { best = km; name = d.n; }
+    }
+    if (best > 5) name = "خارج نواكشوط";
+  }
+  districtCache.set(key, name);
+  return name;
+}
+// «مسجد بلا اسم» يُعرض مع مقاطعته حتى يتميّز: «مسجد بلا اسم · عرفات»
+const mosqueLabel = m => m.name === "مسجد بلا اسم" ? `مسجد بلا اسم · ${districtOf(m)}` : m.name;
+let openGrps = new Set();
 function renderMosqueList() {
   const q = normAr($("mSearch") ? $("mSearch").value : "");
   const all = allMosques().map(m => ({ m, d: here && hasPos(m) ? distKm(here, m) : null }))
@@ -1219,7 +1257,7 @@ function renderMosqueList() {
       <div class="mrow ${isSel(m) ? "sel" : ""}" data-id="${escapeHtml(m.id)}">
         <div class="mtop">
           <button class="fav ${favs.includes(m.id) ? "on" : ""}" data-fav="${escapeHtml(m.id)}" aria-label="مفضّل"><svg class="si" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></button>
-          <div class="nm">${escapeHtml(m.name)}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}${allApprox(m) ? '<span class="tag">تقريبي</span>' : ""}${isSel(m) ? '<span class="tag on">مسجدك</span>' : ""}</div>
+          <div class="nm">${escapeHtml(mosqueLabel(m))}${m.mine ? '<span class="tag">أضفته</span>' : ""}${m.edited ? '<span class="tag">معدّل</span>' : ""}${allApprox(m) ? '<span class="tag">تقريبي</span>' : ""}${isSel(m) ? '<span class="tag on">مسجدك</span>' : ""}</div>
           ${d !== null ? `<span class="dist">${fmtDist(d)}</span>` : ""}
           ${hasPos(m) ? `<button class="ib" data-go="${escapeHtml(m.id)}" aria-label="الطريق"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></button>` : ""}
           <button class="ib" data-edit="${escapeHtml(m.id)}" aria-label="تعديل"><svg class="si" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
@@ -1237,7 +1275,19 @@ function renderMosqueList() {
     // المسجد المختار يدوياً يبقى ظاهراً دائماً
     const shown = showAllMosques ? rest : rest.filter((x, i) => i < NEAR_COUNT || isSel(x.m));
     if (fav.length) html += '<div class="mSection">المفضلة</div>' + fav.map(row).join("");
-    if (shown.length) html += `<div class="mSection">${showAllMosques ? "كل المساجد" : "الأقرب إليك"}</div>` + shown.map(row).join("");
+    if (showAllMosques) {
+      // كل المساجد مقسّمة حسب المقاطعات: مقاطعتك أولاً ثم الأقرب، وكل قسم يُفتح بالضغط عليه
+      const groups = new Map();
+      for (const x of rest) { const k = districtOf(x.m); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); }
+      const mine = here ? districtOf(here) : null;
+      if (mine && groups.has(mine) && !openGrps.size) openGrps.add(mine);
+      const order = [...groups.keys()].sort((a, b) => (b === mine) - (a === mine) || (groups.get(a)[0].d ?? 1e9) - (groups.get(b)[0].d ?? 1e9));
+      html += '<div class="mSection">كل المساجد حسب المقاطعة</div>' + order.map(k => {
+        const open = openGrps.has(k);
+        return `<div class="dGrp"><button class="dHead ${open ? "open" : ""}" data-grp="${escapeHtml(k)}"><span>${escapeHtml(k)}${k === mine ? ' <small>· أنت هنا</small>' : ""}</span><span class="cnt">${groups.get(k).length} ${open ? "⌄" : "‹"}</span></button>
+          ${open ? `<div class="dBody">${groups.get(k).map(row).join("")}</div>` : ""}</div>`;
+      }).join("");
+    } else if (shown.length) html += '<div class="mSection">الأقرب إليك</div>' + shown.map(row).join("");
     const hidden = rest.length - shown.length;
     if (hidden > 0) html += `<button class="bigBtn" id="showAllM">عرض كل المساجد (${rest.length})</button>`;
   }
@@ -1258,6 +1308,7 @@ async function sheetClick(e) {
     return renderMosqueList();
   }
   if (t.id === "showAllM") { showAllMosques = true; return renderMosqueList(); }
+  if (t.dataset && t.dataset.grp) { const k = t.dataset.grp; openGrps.has(k) ? openGrps.delete(k) : openGrps.add(k); return renderMosqueList(); }
   if (t.id === "mSearch") return;
   if (t.dataset && t.dataset.go) { e.stopPropagation(); const m = allMosques().find(x => x.id === t.dataset.go); if (m) openDirections(m); return; }
   if (t.id === "addHere") {
