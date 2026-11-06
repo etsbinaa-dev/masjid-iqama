@@ -309,6 +309,19 @@
   .mrow.sel { outline:1.5px solid var(--accent); }
   /* الإعدادات في مجموعات */
   .grpTitle { color:var(--accent); font-size:.85rem; font-weight:700; margin:10px 4px -4px; }
+  .rowBtn { display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; background:var(--card); border:none; border-radius:14px; padding:14px 16px; color:var(--text); font-size:1rem; text-align:start; }
+  .rowBtn .val { color:var(--accent); font-size:.9rem; }
+  .pinList { display:flex; flex-direction:column; gap:8px; }
+  .pinList:empty { display:none; }
+  .pinRow { display:flex; align-items:center; gap:8px; background:var(--card); border-radius:14px; padding:10px 12px 10px 8px; }
+  .pinRow .t { flex:1; line-height:1.5; }
+  .pinRow .t small { display:block; color:var(--muted); font-size:.8rem; }
+  .pinRow .x { border:none; color:var(--muted); font-size:1.1rem; padding:4px 10px; }
+  .pinPr { display:flex; flex-wrap:wrap; gap:8px; }
+  .pinPr label { display:flex; align-items:center; gap:6px; background:var(--card); border-radius:999px; padding:6px 12px; font-size:.95rem; }
+  .pinPick { width:100%; text-align:start; background:var(--card); border:1px solid var(--hair); border-radius:12px; padding:10px 12px; color:var(--text); }
+  .pinPick small { color:var(--muted); }
+  .pinPick.on { border-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -355,6 +368,12 @@
   <div class="pageTitle" id="settingsSummary">الإعدادات</div>
   <div class="settings" id="settingsBox">
     <div class="body">
+    <div class="grpTitle">مساجدي</div>
+    <button class="rowBtn" id="myMainBtn"><span>المسجد الأساسي</span><span class="val" id="myMainVal"></span></button>
+    <div class="pinList" id="pinList"></div>
+    <button class="moreBtn" id="pinAdd">+ مسجد لصلاة معيّنة (مثلاً الظهر قرب العمل) ‹</button>
+    <div class="hint2">يُستعمل المسجد المعيّن إذا كنت في حدود 3 كم منه، وإلا فوقت الأقرب إليك.</div>
+    <button class="bgLoc" id="bgLocBtn2" hidden>📍 ليعمل هذا والتطبيق مغلق: اسمح بالموقع «طوال الوقت»</button>
     <div class="grpTitle">التنبيهات</div>
     <label for="notifyOn">تفعيل التنبيه
       <input type="checkbox" id="notifyOn">
@@ -382,6 +401,15 @@
     </div>
     <div class="status" id="notifyStatus"></div>
     <button id="exactBtn" hidden>اسمح بالتنبيه في الوقت الدقيق</button>
+    <div class="grpTitle">التذكيرات</div>
+    <label for="adhkarRemind">تذكير بأذكار الصباح والمساء
+      <input type="checkbox" id="adhkarRemind">
+    </label>
+    <div class="hint2">بعد إقامة الفجر والعصر بنصف ساعة، بإشعار عادي دون أذان. الضغط عليه يفتح الأذكار.</div>
+    <label for="fridayRemind">تذكير يوم الجمعة
+      <input type="checkbox" id="fridayRemind">
+    </label>
+    <div class="hint2">صباح الجمعة: سورة الكهف والإكثار من الصلاة على النبي صلى الله عليه وسلم.</div>
     <div class="grpTitle">السفر</div>
     <label for="travelSel">وضع السفر
       <select id="travelSel">
@@ -394,15 +422,6 @@
       <button class="moreBtn" id="travelEdit">تعديل دقائق الإقامة في السفر ‹</button>
       <div class="prRows" id="travelRows" hidden></div>
     </div>
-    <div class="grpTitle">التذكيرات</div>
-    <label for="adhkarRemind">تذكير بأذكار الصباح والمساء
-      <input type="checkbox" id="adhkarRemind">
-    </label>
-    <div class="hint2">بعد إقامة الفجر والعصر بنصف ساعة، بإشعار عادي دون أذان. الضغط عليه يفتح الأذكار.</div>
-    <label for="fridayRemind">تذكير يوم الجمعة
-      <input type="checkbox" id="fridayRemind">
-    </label>
-    <div class="hint2">صباح الجمعة: سورة الكهف والإكثار من الصلاة على النبي صلى الله عليه وسلم.</div>
     <div class="grpTitle">المظهر والتاريخ</div>
     <label for="fontSel">حجم الخط
       <select id="fontSel">
@@ -426,12 +445,12 @@
         <option value="1">زائد يوم</option>
       </select>
     </label>
-    <div class="grpTitle">حول التطبيق</div>
+    <div class="grpTitle" id="aboutTitle">حول التطبيق</div>
     <div class="updated" id="updated"></div>
     <div class="updated" id="otaStatus"></div>
     <div class="updated">مواقع بعض المساجد من خريطة © OpenStreetMap</div>
     <button class="linkBtn" id="checkUpdBtn" style="color:var(--accent)">البحث عن تحديث الآن</button>
-    <button class="linkBtn" id="adminBtn">دخول المشرف</button>
+    <button class="linkBtn" id="adminBtn" hidden>دخول المشرف</button>
     <button class="linkBtn" id="osmImport" style="color:var(--accent)" hidden></button>
     </div>
   </div>
@@ -574,7 +593,7 @@ const Notif = window.Capacitor && window.Capacitor.isNativePlatform()
 // ---------- العرض ----------
 function todayPrayers(now) {
   const list = cfg.prayers.map(p => ({ ...p }));
-  if (now.getDay() === 5) list[1] = { name: "الجمعة", iqama: cfg.jumuah, approx: cfg.jumApprox };
+  if (now.getDay() === 5) list[1] = { name: "الجمعة", iqama: cfg.jumuah, approx: cfg.jumApprox, from: cfg.jumFrom, far: cfg.jumFar };
   return list;
 }
 function toDate(hhmm, base) {
@@ -631,7 +650,8 @@ function render() {
   // بعد العشاء: الإقامة القادمة هي فجر الغد، فنكبّر الفجر بدل تبهيت كل الصلوات
   const nextIdx = nx.index === -1 ? 0 : nx.index;
   $("list").innerHTML = shown.map((p, i) => {
-    const az = p => p.adhan ? `<small class="az">الأذان ${fmt12(p.adhan)}</small>` : "";
+    const az = p => (p.adhan ? `<small class="az">الأذان ${fmt12(p.adhan)}</small>` : "") +
+      (p.from ? `<small class="az">في ${escapeHtml(shortName(p.from.name))}</small>` : "");
     const ap = cfg.travel || p.approx ? "~" : "";   // في السفر، أو وقت غير معروف: الإقامة تقريبية
     if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span>
       <div class="cd"><span>${ap ? "الإقامة التقريبية القادمة" : "الإقامة القادمة"}${nx.index === -1 ? " (غداً)" : ""}</span><span>${arDuration(mins)}</span></div>
@@ -642,6 +662,17 @@ function render() {
   const listDay = nx.index === -1 ? tmr : now;
   $("jumuahLine").textContent = cfg.travel ? "الأذان محسوب لموقعك، والإقامة تقريبية"
     : listDay.getDay() === 5 ? "" : `${nx.index === -1 ? "أوقات الغد · " : ""}الجمعة ${cfg.jumApprox ? "~" : ""}${fmt12(cfg.jumuah)}`;
+  // صلاة لها مسجد معيّن وأنت بعيد عنه: نوضّح أن وقتها من مسجدك المعتاد
+  const farP = shown.find(p => p.far);
+  if (farP && !cfg.travel) $("jumuahLine").textContent = [$("jumuahLine").textContent,
+    `${farP.name}: بعيد عن ${shortName(farP.far.name)}، الوقت من الأقرب إليك`].filter(Boolean).join(" · ");
+  // الطريق يأخذك إلى مسجد الصلاة القادمة (قد يكون مسجداً معيّناً لتلك الصلاة)
+  const go = (nx.prayer && nx.prayer.from) || current;
+  if (go && $("whereGo").dataset.id !== go.id) {
+    $("whereGo").dataset.id = go.id;
+    $("whereGo").innerHTML = '· <svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg> طريق ' + escapeHtml(shortName(go.name));
+  }
+  goTarget = go;
   // أوقات تقريبية في مسجد مسجّل: دعوة لإكمالها
   $("approxHint").hidden = cfg.travel || !hasApprox(current);
   $("shareMain").hidden = cfg.travel;
@@ -670,6 +701,34 @@ function allMosques() {
   const known = list.filter(m => hasPos(m) && Array.isArray(m.prayers) && m.prayers.some(p => !p.approx));
   return list.map(m => withMaghrib(withApprox(m, known)));
 }
+// ---------- مسجد لصلاة معيّنة ----------
+// settings.pins = { dhuhr: "id", jumuah: "id", ... }: صلاة تُصلّى في مسجد معيّن (مثلاً الظهر قرب العمل).
+// يُستعمل إذا كان الموقع في حدود 3 كم من ذلك المسجد، وإلا فوقت المسجد المعتاد (الأقرب أو المختار).
+const PIN_KM = 3;
+const PIN_KEYS = ["fajr", "dhuhr", "asr", "maghrib", "isha", "jumuah"];
+const pins = () => settings.pins || {};
+const hasPins = () => Object.keys(pins()).length > 0;
+const pinRef = m => ({ id: m.id, name: m.name, lat: m.lat, lng: m.lng });
+function applyPins(c, pos, list) {
+  const P = pins();
+  if (!Object.keys(P).length) return c;
+  list = list || allMosques();
+  const out = { ...c, prayers: c.prayers.map(p => ({ ...p })) };
+  PIN_KEYS.forEach((k, i) => {
+    const m = P[k] && list.find(x => x.id === P[k]);
+    if (!m) return;
+    const near = !pos || !hasPos(m) || distKm(pos, m) <= PIN_KM;
+    if (k === "jumuah") {
+      if (near) Object.assign(out, { jumuah: m.jumuah, jumApprox: !!m.jumApprox, jumFrom: pinRef(m) });
+      else out.jumFar = pinRef(m);
+      return;
+    }
+    if (near) out.prayers[i] = { ...m.prayers[i], name: c.prayers[i].name, from: pinRef(m) };
+    else out.prayers[i].far = pinRef(m);
+  });
+  return out;
+}
+
 // ---------- الأوقات غير المعروفة ----------
 // صلاة عليها approx (أو الجمعة وعليها prayers[1].jumuah_approx) = لا يعرف من أضافها وقتها.
 // نملؤها من أقرب مسجد موثّق في نفس المدينة (حتى 30 كم)، لأن عادات المساجد المحلية (مثل الظهر 2:30)
@@ -852,6 +911,7 @@ function applyMosque(reschedule = true) {
   current = p.m; currentWhy = p.why; currentDist = p.d;
   cfg = { mosqueName: current.travel ? current.name : mosqueLabel(current), note: current.note || "", prayers: current.prayers, jumuah: current.jumuah, lat: current.lat, lng: current.lng,
           sunrise: current.sunrise || null, travel: !!current.travel, jumApprox: !!current.jumApprox };
+  if (!current.travel) cfg = applyPins(cfg, here);
   if (current.travel) fetchPlaceName(current);
   const ic = document.querySelector("#mosquesBtn .si");
   if (ic) ic.innerHTML = current.travel ? '<path d="M12 6v12M6 12h12"/>' : '<path d="M6 9l6 6 6-6"/>';
@@ -863,9 +923,10 @@ function applyMosque(reschedule = true) {
     currentWhy === "fixed" ? "اخترته يدوياً" : "اضغط على اسم المسجد لاختيار مسجدك";
   renderNearest();
   // نعيد الضبط أيضاً إن تغيّر الوضع (يدوي/تلقائي) أو أوقات/مواقع المساجد، لأن الفحص قبل الصلاة يعتمد عليها
-  const sig = JSON.stringify([cfg, currentWhy === "fixed",
+  const sig = JSON.stringify([cfg, currentWhy === "fixed", pins(),
     allMosques().filter(hasPos).map(m => [m.name, m.lat, m.lng, m.prayers, m.jumuah])]);
   render();
+  renderMySettings();
   if (reschedule && lastSig !== null && sig !== lastSig) scheduleAll();
   lastSig = sig;
 }
@@ -882,7 +943,6 @@ function renderNearest() {
   // إن كان الأقرب هو المسجد المعروض فلا داعي لتكرار اسمه؛ الطريق إليه بجانب سطر المسجد
   $("nearBtn").hidden = !!(nearest && current && nearest.m.id === current.id) || currentWhy === "travel";
   $("whereGo").hidden = !(current && hasPos(current)) || currentWhy === "travel";
-  if (current) $("whereGo").innerHTML = '· <svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg> طريق ' + escapeHtml(shortName(current.name));
   if (nearest) {
     $("nearName").textContent = `${mosqueLabel(nearest.m)} · ${fmtDist(nearest.d)}`;
     $("nearGo").textContent = "الطريق ‹";
@@ -906,7 +966,8 @@ function openDirections(m) {
   window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}&travelmode=walking`;
 }
 $("approxHint").onclick = () => { if (current && !current.travel) openEdit(current.id); };
-$("whereGo").onclick = () => { if (current && hasPos(current)) openDirections(current); };
+let goTarget = null;
+$("whereGo").onclick = () => { const g = goTarget || current; if (g && hasPos(g)) openDirections(g); };
 $("nearBtn").onclick = () => {
   if (!nearest) { $("nearName").textContent = "جارٍ تحديد موقعك…"; locate(); return; }
   openMosquePage(nearest.m.id);
@@ -1066,6 +1127,7 @@ async function loadPending() {
   renderAdmin();
 }
 function renderAdmin() {
+  $("adminBtn").hidden = !admin && !store.get("adminUnlock", false);
   $("adminBtn").innerHTML = '<svg class="si" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> ' + (admin ? `المشرف: ${escapeHtml(admin.email)} · الاقتراحات` : "دخول المشرف");
   const n = pendingSubs.length;
   $("adminBar").hidden = !admin || !n;
@@ -1213,8 +1275,10 @@ function renderMosquePage(id) {
       <button id="mpShare"><svg class="si" viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>مشاركة</button>
       ${isMine ? "" : `<button id="mpChoose"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>اجعله مسجدي</button>`}
     </div>
-    ${isMine ? '<div class="form"><div class="msg">هذا مسجدك الحالي، وتنبيهاتك منه.</div></div>' : ""}`;
+    ${isMine ? '<div class="form"><div class="msg">هذا مسجدك الحالي، وتنبيهاتك منه.</div></div>' : ""}
+    <button class="bigBtn soft" id="mpPin">${(() => { const ks = PIN_KEYS.filter(k => pins()[k] === m.id); return ks.length ? "تصلّي فيه: " + ks.map(k => PRAYER_NAMES[k]).join("، ") + " · تعديل ‹" : "أصلّي فيه صلاة معيّنة… ‹"; })()}</button>`;
   if ($("mpGo")) $("mpGo").onclick = () => openDirections(m);
+  $("mpPin").onclick = () => openPinForm(m.id);
   if ($("mpApprox")) $("mpApprox").onclick = () => { history.back(); setTimeout(() => openEdit(m.id), 50); };
   $("mpShare").onclick = () => shareMosque(m);
   if ($("mpChoose")) $("mpChoose").onclick = () => chooseMosque({ mode: "fixed", id: m.id });
@@ -1251,6 +1315,84 @@ function renderSheet() {
   $("mSearch").addEventListener("input", renderMosqueList);
   renderMosqueList();
 }
+// ---------- «مساجدي» في الإعدادات، ونموذج مسجد لصلاة معيّنة ----------
+function renderMySettings() {
+  if (!$("myMainVal") || !current) return;
+  $("myMainVal").textContent = currentWhy === "travel" ? "وضع السفر" :
+    choice.mode === "auto" ? `الأقرب تلقائياً · ${shortName(mosqueLabel(current))}` : shortName(mosqueLabel(current));
+  const list = allMosques(), P = pins();
+  $("pinList").innerHTML = PIN_KEYS.filter(k => P[k]).map(k => {
+    const m = list.find(x => x.id === P[k]);
+    const i = PIN_KEYS.indexOf(k);
+    const apx = m && (k === "jumuah" ? m.jumApprox : m.prayers[i] && m.prayers[i].approx);
+    const dist = m && here && hasPos(m) ? distKm(here, m) : null;
+    return `<div class="pinRow"><div class="t">${PRAYER_NAMES[k]} ← ${m ? escapeHtml(mosqueLabel(m)) : "مسجد محذوف"}
+      <small>${dist === null ? "" : dist <= PIN_KM ? "أنت قريب منه الآن" : `أنت بعيد عنه (${fmtDist(dist)})، فالوقت من الأقرب إليك`}</small>
+      ${apx ? `<button class="approxHint" style="margin:4px 0 0;text-align:start" data-pinfix="${escapeHtml(P[k])}">وقت ${PRAYER_NAMES[k]} فيه غير معروف — أضِفه ليكون التنبيه دقيقاً ‹</button>` : ""}</div>
+      <button class="x" data-unpin="${k}" aria-label="إلغاء">✕</button></div>`;
+  }).join("");
+}
+$("myMainBtn").onclick = () => showTab("mosques");
+$("pinList").addEventListener("click", e => {
+  const t = e.target.closest("[data-unpin],[data-pinfix]");
+  if (!t) return;
+  if (t.dataset.pinfix) return openEdit(t.dataset.pinfix);
+  const P = { ...pins() }; delete P[t.dataset.unpin];
+  settings.pins = P; store.set("settings", settings);
+  applyMosque(); scheduleAll(); refreshBgLoc();
+});
+$("pinAdd").onclick = () => openPinForm(null);
+// النموذج: اختيار الصلوات ثم المسجد (بالبحث، الأقرب أولاً)
+let pinSel = null, pinChecked = new Set(), pinQuery = "";
+function openPinForm(mosqueId) {
+  pinSel = mosqueId; pinQuery = "";
+  pinChecked = new Set(mosqueId ? PIN_KEYS.filter(k => pins()[k] === mosqueId) : []);
+  if (mosqueId && !pinChecked.size) pinChecked.add("dhuhr");
+  sheetView = "pin"; renderPinForm(); $("sheet").hidden = false; history.pushState({ sheet: true }, "");
+}
+function renderPinForm() {
+  $("sheetHome").hidden = true;
+  $("sheetTitle").textContent = "مسجد لصلاة معيّنة";
+  const list = allMosques(), m = pinSel && list.find(x => x.id === pinSel);
+  let picker = "";
+  if (!m) {
+    const q = normAr(pinQuery);
+    const found = list.filter(x => hasPos(x) && (!q || normAr(mosqueLabel(x)).includes(q)))
+      .map(x => ({ x, d: here ? distKm(here, x) : null })).sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9)).slice(0, 12);
+    picker = `<input class="mSearch" id="pinSearch" type="search" placeholder="ابحث باسم المسجد أو المقاطعة" value="${escapeHtml(pinQuery)}" autocomplete="off">
+      ${found.map(({ x, d }) => `<button class="pinPick" data-pick="${escapeHtml(x.id)}">${escapeHtml(mosqueLabel(x))}<br><small>${d !== null ? fmtDist(d) + " · " : ""}${escapeHtml(districtOf(x))}</small></button>`).join("") || '<div class="mEmpty">لا يوجد مسجد بهذا الاسم</div>'}`;
+  }
+  $("sheetBody").innerHTML = `<div class="form" style="display:flex;flex-direction:column;gap:10px">
+    <div class="hint2">أي صلاة تصلّيها في مسجد معيّن؟</div>
+    <div class="pinPr">${PIN_KEYS.map(k => `<label><input type="checkbox" data-pk="${k}" ${pinChecked.has(k) ? "checked" : ""}>${PRAYER_NAMES[k]}</label>`).join("")}</div>
+    <div class="hint2">المسجد:</div>
+    ${m ? `<button class="pinPick on" data-pick="">${escapeHtml(mosqueLabel(m))}<br><small>${here && hasPos(m) ? fmtDist(distKm(here, m)) + " · " : ""}${escapeHtml(districtOf(m))} · اضغط للتغيير</small></button>` : picker}
+    <div class="hint2">يُستعمل إذا كنت في حدود 3 كم منه، وإلا فوقت الأقرب إليك. الجمعة منفصلة عن الظهر.</div>
+    <button class="bigBtn primary" id="pinSave">حفظ</button>
+    <div class="msg" id="pinMsg"></div>
+  </div>`;
+  if ($("pinSearch")) $("pinSearch").addEventListener("input", e => {
+    pinQuery = e.target.value; const pos = e.target.selectionStart;
+    renderPinForm(); const s2 = $("pinSearch"); s2.focus(); s2.setSelectionRange(pos, pos);
+  });
+  $("sheetBody").querySelectorAll("[data-pk]").forEach(cb => cb.onchange = () => { cb.checked ? pinChecked.add(cb.dataset.pk) : pinChecked.delete(cb.dataset.pk); });
+  $("pinSave").onclick = () => {
+    if (!pinChecked.size && !PIN_KEYS.some(k => pins()[k] === pinSel)) { $("pinMsg").textContent = "اختر صلاة واحدة على الأقل."; return; }
+    if (!pinSel) { $("pinMsg").textContent = "اختر المسجد."; return; }
+    const P = { ...pins() };
+    for (const k of PIN_KEYS) {
+      if (pinChecked.has(k)) P[k] = pinSel;
+      else if (P[k] === pinSel) delete P[k];
+    }
+    settings.pins = P; store.set("settings", settings);
+    applyMosque(); scheduleAll(); refreshBgLoc();
+    history.back();
+  };
+}
+// زر المشرف مخفي عن المجرّبين: يظهر بالضغط 5 مرات على «حول التطبيق» (ويبقى ظاهراً للمشرف الداخل)
+let aboutTaps = 0;
+$("aboutTitle").onclick = () => { if (++aboutTaps >= 5) { store.set("adminUnlock", true); $("adminBtn").hidden = false; } };
+
 // ---------- مقاطعات نواكشوط ----------
 // حدود المقاطعات التسع (مبسّطة) من خريطة © OpenStreetMap: [خط الطول، خط العرض]
 const DISTRICTS = [{"n":"لكصر","p":[[-15.97,18.0683],[-15.9652,18.0791],[-15.961,18.088],[-15.9604,18.0884],[-15.9535,18.0983],[-15.9529,18.099],[-15.9471,18.106],[-15.945,18.1086],[-15.9384,18.117],[-15.9437,18.1209],[-15.9445,18.1199],[-15.9469,18.1215],[-15.9519,18.1234],[-15.947,18.1769],[-15.9965,18.1767],[-15.9815,18.1383],[-15.9778,18.1265],[-15.9752,18.1192],[-15.9719,18.1111],[-15.9727,18.1072],[-15.9748,18.1043],[-15.9756,18.1002],[-15.9682,18.0988],[-15.9684,18.0979],[-15.968,18.0972],[-15.97,18.0866],[-15.9749,18.0874],[-15.976,18.0814],[-15.9764,18.0797],[-15.9769,18.0788],[-15.9774,18.0784],[-15.977,18.0777],[-15.9746,18.0773],[-15.9752,18.074],[-15.9755,18.0724],[-15.9755,18.0717],[-15.9755,18.0709],[-15.9748,18.0702],[-15.9741,18.0698],[-15.97,18.0683]]},{"n":"تفرغ زينة","p":[[-16.0282,18.1765],[-16.0448,18.1764],[-16.0447,18.1637],[-16.0446,18.1586],[-16.0446,18.1551],[-16.0445,18.1348],[-16.0444,18.1236],[-16.0443,18.0996],[-16.0285,18.0978],[-16.0269,18.0976],[-16.0259,18.0975],[-16.024,18.0973],[-16.0221,18.0973],[-16.0188,18.0972],[-16.0079,18.0899],[-16.0017,18.0857],[-16.0005,18.085],[-15.9992,18.0845],[-15.9983,18.0843],[-15.9971,18.0841],[-15.9955,18.0841],[-15.9939,18.0843],[-15.9902,18.0855],[-15.9863,18.0867],[-15.9859,18.0844],[-15.9853,18.0824],[-15.985,18.0815],[-15.9844,18.0806],[-15.9841,18.0802],[-15.9839,18.0797],[-15.9833,18.0788],[-15.983,18.0786],[-15.9821,18.0784],[-15.9771,18.0777],[-15.977,18.0777],[-15.9774,18.0784],[-15.9769,18.0788],[-15.9764,18.0797],[-15.976,18.0814],[-15.9749,18.0874],[-15.97,18.0866],[-15.968,18.0972],[-15.9684,18.0979],[-15.9682,18.0988],[-15.9756,18.1002],[-15.9748,18.1043],[-15.9727,18.1072],[-15.9719,18.1111],[-15.9752,18.1192],[-15.9778,18.1265],[-15.9815,18.1383],[-15.9965,18.1767],[-16.0282,18.1765]]},{"n":"السبخة","p":[[-16.0443,18.0996],[-16.0439,18.0509],[-16.0252,18.0549],[-16.0247,18.055],[-16.0113,18.058],[-15.9913,18.0702],[-15.9851,18.0741],[-15.9832,18.0755],[-15.9827,18.076],[-15.9823,18.0771],[-15.9821,18.0784],[-15.983,18.0786],[-15.9833,18.0788],[-15.9839,18.0797],[-15.9841,18.0802],[-15.9844,18.0806],[-15.985,18.0815],[-15.9853,18.0824],[-15.9859,18.0844],[-15.9863,18.0867],[-15.9902,18.0855],[-15.9939,18.0843],[-15.9955,18.0841],[-15.9971,18.0841],[-15.9983,18.0843],[-15.9992,18.0845],[-16.0005,18.085],[-16.0017,18.0857],[-16.0079,18.0899],[-16.0188,18.0972],[-16.0221,18.0973],[-16.024,18.0973],[-16.0259,18.0975],[-16.0269,18.0976],[-16.0285,18.0978],[-16.0443,18.0996]]},{"n":"عرفات","p":[[-15.97,18.0683],[-15.972,18.0636],[-15.9739,18.0594],[-15.975,18.0569],[-15.9754,18.0557],[-15.9756,18.0534],[-15.9754,18.0517],[-15.9744,18.0477],[-15.9733,18.0432],[-15.9724,18.0391],[-15.9723,18.0369],[-15.9726,18.0345],[-15.9731,18.0319],[-15.9647,18.0306],[-15.9645,18.0292],[-15.9602,18.0301],[-15.9488,18.0299],[-15.9453,18.0395],[-15.9427,18.047],[-15.9408,18.0502],[-15.9401,18.0519],[-15.9385,18.0566],[-15.9371,18.0616],[-15.9381,18.0621],[-15.9385,18.0623],[-15.9358,18.071],[-15.9652,18.0791],[-15.97,18.0683]]},{"n":"الميناء","p":[[-15.9821,18.0784],[-15.9823,18.0771],[-15.9827,18.076],[-15.9832,18.0755],[-15.9851,18.0741],[-15.9913,18.0702],[-16.0113,18.058],[-16.0247,18.055],[-16.0252,18.0549],[-16.0439,18.0509],[-16.0436,17.976],[-16.02,17.9762],[-15.9724,17.9765],[-15.9773,18.0051],[-15.9777,18.0081],[-15.9771,18.0118],[-15.9731,18.0319],[-15.9726,18.0345],[-15.9723,18.0369],[-15.9724,18.0391],[-15.9733,18.0432],[-15.9744,18.0477],[-15.9754,18.0517],[-15.9756,18.0534],[-15.9754,18.0557],[-15.975,18.0569],[-15.9739,18.0594],[-15.972,18.0636],[-15.97,18.0683],[-15.9741,18.0698],[-15.9748,18.0702],[-15.9755,18.0709],[-15.9755,18.0717],[-15.9755,18.0724],[-15.9752,18.074],[-15.9746,18.0773],[-15.977,18.0777],[-15.9771,18.0777],[-15.9821,18.0784]]},{"n":"الرياض","p":[[-15.9488,18.0299],[-15.9602,18.0301],[-15.9645,18.0292],[-15.9647,18.0306],[-15.9731,18.0319],[-15.9771,18.0118],[-15.9777,18.0081],[-15.9773,18.0051],[-15.9724,17.9765],[-15.8877,17.9769],[-15.8882,18.0303],[-15.9488,18.0299]]},{"n":"توجنين","p":[[-15.9488,18.0299],[-15.8882,18.0303],[-15.8885,18.092],[-15.8888,18.1416],[-15.9134,18.1088],[-15.9194,18.1009],[-15.9214,18.0983],[-15.9232,18.0963],[-15.9278,18.0923],[-15.9327,18.0873],[-15.935,18.0734],[-15.9358,18.071],[-15.9385,18.0623],[-15.9381,18.0621],[-15.9371,18.0616],[-15.9385,18.0566],[-15.9401,18.0519],[-15.9408,18.0502],[-15.9427,18.047],[-15.9453,18.0395],[-15.9488,18.0299]]},{"n":"دار النعيم","p":[[-15.9384,18.117],[-15.945,18.1086],[-15.9471,18.106],[-15.9529,18.099],[-15.9535,18.0983],[-15.9604,18.0884],[-15.961,18.088],[-15.9652,18.0791],[-15.9358,18.071],[-15.935,18.0734],[-15.9327,18.0873],[-15.9278,18.0923],[-15.9232,18.0963],[-15.9214,18.0983],[-15.9194,18.1009],[-15.9134,18.1088],[-15.8888,18.1416],[-15.9179,18.1414],[-15.9212,18.1383],[-15.9228,18.1366],[-15.9257,18.1332],[-15.9272,18.1312],[-15.9286,18.1297],[-15.9384,18.117]]},{"n":"تيارت","p":[[-15.9384,18.117],[-15.9286,18.1297],[-15.9272,18.1312],[-15.9257,18.1332],[-15.9228,18.1366],[-15.9212,18.1383],[-15.9179,18.1414],[-15.8934,18.1772],[-15.8949,18.1772],[-15.947,18.1769],[-15.9519,18.1234],[-15.9469,18.1215],[-15.9445,18.1199],[-15.9437,18.1209],[-15.9384,18.117]]}];
@@ -1368,6 +1510,7 @@ async function sheetClick(e) {
     store.set("favMosques", favs);
     return renderMosqueList();
   }
+  if (t.dataset && t.dataset.pick !== undefined && sheetView === "pin") { pinSel = t.dataset.pick || null; pinQuery = ""; return renderPinForm(); }
   if (t.id === "showAllM") { showAllMosques = true; return renderMosqueList(); }
   if (t.dataset && t.dataset.grp) { const k = t.dataset.grp; openGrps.has(k) ? openGrps.delete(k) : openGrps.add(k); return renderMosqueList(); }
   if (t.id === "mSearch") return;
@@ -1573,7 +1716,7 @@ const minsWord = n => n <= 10 ? `${n} دقائق` : `${n} دقيقة`;
 function buildAlarms(c = cfg) {
   const items = [];
   const key = { "الفجر": "fajr", "الظهر": "dhuhr", "العصر": "asr", "المغرب": "maghrib", "العشاء": "isha", "الجمعة": "jumuah" };
-  const add = (id, name, iqama, weekday, approx) => {
+  const add = (id, name, iqama, weekday, approx, from) => {
     const n = settings.perMin[key[name] || "fajr"] || 10;
     const at = minus(iqama, n);
     items.push({
@@ -1581,13 +1724,13 @@ function buildAlarms(c = cfg) {
       iq: Number(iqama.split(":")[0]) * 60 + Number(iqama.split(":")[1]),   // وقت الإقامة بالدقائق (لموعد فحص الموقع)
       sound: id === 1 && fajrAdhanReady ? "file:" + FAJR_ADHAN : settings.sound,
       title: `إقامة ${name} بعد ${minsWord(n)}`,
-      body: `${c.mosqueName} — الإقامة ${approx ? "~" : ""}${fmt12(iqama)}${approx ? " (تقريبية)" : ""}`
+      body: `${from ? from.name : c.mosqueName} — الإقامة ${approx ? "~" : ""}${fmt12(iqama)}${approx ? " (تقريبية)" : ""}`
     });
   };
   const [fajr, dhuhr, asr, maghrib, isha] = c.prayers;
   const on = settings.prayers;
-  if (on.fajr) add(1, "الفجر", fajr.iqama, 0, fajr.approx);
-  if (on.asr) add(3, "العصر", asr.iqama, 0, asr.approx);
+  if (on.fajr) add(1, "الفجر", fajr.iqama, 0, fajr.approx, fajr.from);
+  if (on.asr) add(3, "العصر", asr.iqama, 0, asr.approx, asr.from);
   // المغرب: تنبيه لكل يوم من أيام الأسبوع بوقته (41=الأحد ... 47=السبت)، لأن الغروب يتغيّر يومياً
   if (on.maghrib) {
     const now = new Date(), n = settings.perMin.maghrib || 10;
@@ -1595,27 +1738,31 @@ function buildAlarms(c = cfg) {
       const day = new Date(now); day.setDate(now.getDate() + k);
       let iq = maghribOn(c, day);
       if (k === 0 && toDate(iq, now) - n * 60000 <= now) { day.setDate(day.getDate() + 7); iq = maghribOn(c, day); }
-      add(41 + day.getDay(), "المغرب", iq, day.getDay() + 1, maghrib.approx);
+      add(41 + day.getDay(), "المغرب", iq, day.getDay() + 1, maghrib.approx, maghrib.from);
     }
   }
-  if (on.isha) add(5, "العشاء", isha.iqama, 0, isha.approx);
+  if (on.isha) add(5, "العشاء", isha.iqama, 0, isha.approx, isha.from);
   // الظهر كل الأيام عدا الجمعة (1=الأحد ... 6=الجمعة، 7=السبت)
-  if (on.dhuhr) [1, 2, 3, 4, 5, 7].forEach(d => add(20 + d, "الظهر", dhuhr.iqama, d, dhuhr.approx));
-  if (on.jumuah) add(26, "الجمعة", c.jumuah, 6, c.jumApprox);
+  if (on.dhuhr) [1, 2, 3, 4, 5, 7].forEach(d => add(20 + d, "الظهر", dhuhr.iqama, d, dhuhr.approx, dhuhr.from));
+  if (on.jumuah) add(26, "الجمعة", c.jumuah, 6, c.jumApprox, c.jumFrom);
   return items;
 }
 // اختيار أقرب مسجد والتطبيق مغلق: نرسل لنظام التنبيه تنبيهات كل مسجد له موقع،
 // ومعها "فحص" قبل كل صلاة بـ20 دقيقة (قبل أبكر إقامة بين المساجد) يأخذ الموقع ويضبط التنبيه على الأقرب،
 // وإن كان التنبيه مضبوطاً قبل الإقامة بأكثر من ذلك فالفحص قبل التنبيه بـ5 دقائق حتى يسبقه دائماً
 function buildAutoPlan(alarms) {
-  if (currentWhy === "fixed" || currentWhy === "travel") return { variants: [], checks: [] };
+  // المسجد المختار يدوياً بلا مساجد معيّنة: لا شيء يتغيّر بالموقع
+  if (currentWhy === "travel" || (currentWhy === "fixed" && !hasPins())) return { variants: [], checks: [] };
   // التنبيه والتطبيق مغلق يختار الأقرب بالمسافة؛ نرسل له أقرب 80 مسجداً لآخر موقع (تكفي للتنقل داخل المدينة،
   // وتتجدد كلما فُتح التطبيق) حتى لا تكبر البيانات مع مئات المساجد
-  const pool = allMosques().filter(hasPos);
+  const all = allMosques(), pool = all.filter(hasPos);
   if (here) pool.sort((a, b) => distKm(here, a) - distKm(here, b));
-  const variants = pool.slice(0, 80).map(m => ({
-    lat: m.lat, lng: m.lng, alarms: buildAlarms({ mosqueName: m.name, prayers: m.prayers, jumuah: m.jumuah, jumApprox: m.jumApprox, lat: m.lat, lng: m.lng })
-  }));
+  // لكل موضع (مسجد): أوقات المسجد المعتاد هناك (هو نفسه، أو المختار يدوياً)، ثم المساجد المعيّنة إن كانت في حدود 3 كم منه
+  const variants = pool.slice(0, 80).map(m => {
+    const b = currentWhy === "fixed" ? current : m;
+    const c = applyPins({ mosqueName: b.name, prayers: b.prayers, jumuah: b.jumuah, jumApprox: b.jumApprox, lat: b.lat, lng: b.lng }, m, all);
+    return { lat: m.lat, lng: m.lng, alarms: buildAlarms(c) };
+  });
   if (variants.length < 2) return { variants: [], checks: [] };
   const checks = alarms.map(a => {
     let ring = 24 * 60, iq = 24 * 60;
@@ -1805,12 +1952,13 @@ if (Notif) { try { Notif.addListener("localNotificationActionPerformed", ev => {
 // زر إذن الموقع "طوال الوقت": يظهر فقط في وضع "الأقرب تلقائياً" إن لم يُسمح بعد
 async function refreshBgLoc() {
   let show = false;
-  if (Alarm && currentWhy !== "fixed") {
+  if (Alarm && (currentWhy !== "fixed" || hasPins())) {
     try { show = !(await Alarm.bgLocationStatus()).granted; } catch {}
   }
-  $("bgLocBtn").hidden = !show;
+  $("bgLocBtn").hidden = !show || currentWhy === "fixed";
+  $("bgLocBtn2").hidden = !show;
 }
-$("bgLocBtn").onclick = async () => { try { await Alarm.requestBgLocation(); } catch {} };
+$("bgLocBtn").onclick = $("bgLocBtn2").onclick = async () => { try { await Alarm.requestBgLocation(); } catch {} };
 $("exactBtn").onclick = async () => {
   try { await Notif.changeExactNotificationSetting(); } catch {}
   scheduleAll();
