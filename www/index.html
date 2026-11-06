@@ -68,6 +68,7 @@
   .status { color:var(--muted); font-size:.9rem; line-height:1.6; }
   .updated { text-align:center; color:var(--muted); font-size:.7rem; opacity:.7; }
   .adhkarRow { display:flex; gap:8px; }
+  .adhkarRow .adhkarBtn.wide { grid-column:1 / -1; }
   .adhkarRow .adhkarBtn { flex:1; margin-top:0; padding:10px 6px; border:none; border-radius:14px; display:flex; flex-direction:column; gap:0; line-height:1.3; }
   .adhkarRow .adhkarBtn small { color:var(--muted); font-size:.75rem; }
   .adhkarRow .adhkarBtn span { font-family:"Amiri",serif; font-size:1.25rem; font-weight:700; }
@@ -131,6 +132,12 @@
   #kahfText { flex:1; min-height:0; overflow-y:auto; font-family:"Warsh",serif; font-size:26px; line-height:2.1; text-align:center; }
   #kahfText .basmala { color:var(--accent); margin-bottom:.3em; }
   #kahfText .end { color:var(--accent); margin:.6em 0 .4em; font-size:.8em; }
+  #kahfText .secT { font-family:"Amiri",serif; font-weight:700; color:var(--accent); font-size:.8em; margin:1.2em 0 .2em; border-top:1px solid var(--hair); padding-top:.6em; }
+  #kahfText .secT:first-child { border-top:none; margin-top:0; padding-top:0; }
+  .kChips { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+  .kChips[hidden] { display:none; }
+  .kChips button { flex:none; border:1px solid var(--hair); background:var(--card); color:var(--text); border-radius:999px; padding:6px 12px; font-size:.85rem; white-space:nowrap; }
+  .kChips button.on { border-color:var(--accent); color:var(--accent); font-weight:700; }
 
   .mosqueSwitch { align-self:center; display:flex; align-items:center; gap:8px; background:none; border:none; color:var(--text);
                   padding:2px 14px; border-radius:999px; }
@@ -361,6 +368,7 @@
     <button class="adhkarBtn" data-sec="after"><svg class="si" viewBox="0 0 24 24"><path d="M12 3c-3 3-3 6 0 8 3-2 3-5 0-8z"/><path d="M5 21v-6a7 7 0 0 1 14 0v6M3 21h18"/></svg><small>أذكار</small><span>بعد الصلاة</span><small class="prog" id="prog_after"></small></button>
     <button class="adhkarBtn" id="tasbihOpen"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="17" cy="9" r="2"/><circle cx="17" cy="15" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="7" cy="15" r="2"/><circle cx="7" cy="9" r="2"/></svg><small>عدّاد</small><span>السبحة</span><small class="prog" id="prog_tasbih"></small></button>
     <button class="adhkarBtn" id="kahfOpen"><svg class="si" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6M9 11h6"/></svg><small>سورة</small><span>الكهف</span><small class="prog" id="prog_kahf"></small></button>
+    <button class="adhkarBtn wide" id="munjOpen"><svg class="si" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg><small>ثماني سور وآيات</small><span>المنجيات</span><small class="prog" id="prog_munj"></small></button>
   </div>
 </div>
 
@@ -514,10 +522,11 @@
 <div id="kahfView" hidden>
   <div class="adhkarHead">
     <button class="backBtn" id="kahfBack"><svg class="si" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>رجوع</button>
-    <div style="text-align:center"><h2>سورة الكهف</h2><small>رواية ورش عن نافع</small></div>
+    <div style="text-align:center"><h2 id="kTitle">سورة الكهف</h2><small>رواية ورش عن نافع</small></div>
     <span style="width:90px"></span>
   </div>
   <div class="pager">
+    <div class="kChips" id="kChips" hidden></div>
     <div class="kahfCard" id="kahfCard">
       <div class="dhead">
         <div class="title" id="kahfPage"></div>
@@ -2133,6 +2142,8 @@ async function renderAdhkarTiles() {
   $("prog_tasbih").textContent = tc ? `العدد ${tc}` : "عدّ حر";
   const kp = Math.round((store.get("kahfPos", 0) || 0) * 100);
   $("prog_kahf").textContent = kp >= 97 ? "✓ قرأتها" : kp > 0 ? `قرأت ${kp}%` : "رواية ورش";
+  const mp = Math.round((store.get("munjPos", 0) || 0) * 100);
+  $("prog_munj").textContent = mp >= 97 ? "✓ أكملتها" : mp > 0 ? `قرأت ${mp}%` : "الفاتحة، الكرسي، خواتيم البقرة وآل عمران، يس، الدخان، الواقعة، الملك";
   document.querySelectorAll("#pgAdhkar .adhkarBtn").forEach(b => b.classList.toggle("now", sug.includes(b.dataset.sec || (b.id === "kahfOpen" ? "kahf" : ""))));
 }
 const SMART = { after: ["أذكار بعد الصلاة", "mosque"], morning: ["أذكار الصباح", "sun"], evening: ["أذكار المساء", "sunset"], sleep: ["أذكار النوم", "moon"], kahf: ["سورة الكهف · يوم الجمعة", "book"] };
@@ -2172,15 +2183,25 @@ $("bnav").addEventListener("click", e => {
 
 // ---------- سورة الكهف (رواية ورش عن نافع، نص وخط مجمع الملك فهد) ----------
 // السورة كاملة في صفحة واحدة تُمرَّر، ويُحفظ موضع القراءة
-let kahf = null;
+let kahf = null, munj = null;
+// القارئ نفسه يعرض الكهف أو المنجيات (ثماني سور وآيات)، ولكل منهما موضع قراءة محفوظ
+let readerKind = "kahf";
+const readerKey = () => readerKind === "munj" ? "munjPos" : "kahfPos";
 const BASMALA_WARSH = "بِسْمِ اِ۬للَّهِ اِ۬لرَّحْمَٰنِ اِ۬لرَّحِيمِ";
 if (!settings.quranPx) settings.quranPx = 26;
 function renderKahf() {
   const el = $("kahfText");
-  const ayat = kahf.pages.flatMap(pg => pg.ayat);
-  $("kahfPage").textContent = `${ayat.length} آية`;
-  el.innerHTML = `<div class="basmala">${BASMALA_WARSH}</div>` + ayat.map(escapeHtml).join(" ") +
-    `<div class="end">صدق الله العظيم</div>`;
+  if (readerKind === "munj") {
+    $("kahfPage").textContent = `${munj.sections.length} سور وآيات`;
+    el.innerHTML = munj.sections.map((sec, i) => `<div class="secT" id="msec${i}">${i + 1}. ${escapeHtml(sec.t)}</div>` +
+      (sec.b ? `<div class="basmala">${BASMALA_WARSH}</div>` : "") + sec.ayat.map(escapeHtml).join(" ")).join("") +
+      `<div class="end">صدق الله العظيم</div>`;
+  } else {
+    const ayat = kahf.pages.flatMap(pg => pg.ayat);
+    $("kahfPage").textContent = `${ayat.length} آية`;
+    el.innerHTML = `<div class="basmala">${BASMALA_WARSH}</div>` + ayat.map(escapeHtml).join(" ") +
+      `<div class="end">صدق الله العظيم</div>`;
+  }
   el.style.fontSize = settings.quranPx + "px";
   $("kZoomOut").style.opacity = settings.quranPx <= ZOOM_MIN ? .35 : 1;
   $("kZoomIn").style.opacity = settings.quranPx >= ZOOM_MAX ? .35 : 1;
@@ -2188,18 +2209,42 @@ function renderKahf() {
 // الموضع نسبةً من طول السورة، حتى يبقى صحيحاً بعد تغيير حجم الخط
 function kahfPos() { const el = $("kahfText"); return el.scrollHeight > el.clientHeight ? el.scrollTop / (el.scrollHeight - el.clientHeight) : 0; }
 function kahfSetPos(r) { const el = $("kahfText"); el.scrollTop = r * (el.scrollHeight - el.clientHeight); }
-async function openKahf() {
-  if (!kahf) { try { kahf = await (await fetch("kahf.json")).json(); } catch { return; } }
+async function openKahf() { return openReader("kahf"); }
+async function openReader(kind) {
+  try {
+    if (kind === "kahf" && !kahf) kahf = await (await fetch("kahf.json")).json();
+    if (kind === "munj" && !munj) munj = await (await fetch("munjiyat.json")).json();
+  } catch { return; }
   closeAdhkar();
+  readerKind = kind;
+  $("kTitle").textContent = kind === "munj" ? "المنجيات" : "سورة الكهف";
+  // أزرار للانتقال بين السور الثماني
+  $("kChips").hidden = kind !== "munj";
+  if (kind === "munj") $("kChips").innerHTML = munj.sections.map((sec, i) =>
+    `<button data-sec="${i}">${escapeHtml(sec.t.replace(/^سورة /, ""))}</button>`).join("");
   $("kahfView").hidden = false;
   renderKahf();
   try { await document.fonts.load('26px "Warsh"'); } catch {}
-  kahfSetPos(store.get("kahfPos", 0) || 0);
+  kahfSetPos(store.get(readerKey(), 0) || 0);
+  markChip();
   history.pushState({ kahf: true }, "");
 }
+// يبرز زر السورة التي تقرؤها الآن
+function markChip() {
+  if (readerKind !== "munj") return;
+  const el = $("kahfText"), top = el.scrollTop + 40;
+  let cur = 0;
+  munj.sections.forEach((_, i) => { const h = $("msec" + i); if (h && h.offsetTop - el.offsetTop <= top) cur = i; });
+  $("kChips").querySelectorAll("button").forEach((b, i) => b.classList.toggle("on", i === cur));
+}
+$("kChips").addEventListener("click", e => {
+  const b = e.target.closest("[data-sec]"); if (!b) return;
+  const el = $("kahfText"), h = $("msec" + b.dataset.sec);
+  if (h) el.scrollTop = h.offsetTop - el.offsetTop;
+});
 function closeKahf() {
   if ($("kahfView").hidden) return;
-  clearTimeout(kSaveTimer); store.set("kahfPos", kahfPos());
+  clearTimeout(kSaveTimer); store.set(readerKey(), kahfPos());
   $("kahfView").hidden = true;
 }
 function kZoom(step) {
@@ -2210,11 +2255,13 @@ function kZoom(step) {
 let kSaveTimer = null;
 $("kahfText").addEventListener("scroll", () => {
   if ($("kahfView").hidden) return;   // الإخفاء يعيد التمرير إلى الصفر فلا نحفظه
-  const r = kahfPos();
+  const r = kahfPos(), key = readerKey();
   clearTimeout(kSaveTimer);
-  kSaveTimer = setTimeout(() => store.set("kahfPos", r), 300);
+  kSaveTimer = setTimeout(() => store.set(key, r), 300);
+  markChip();
 }, { passive: true });
 $("kahfOpen").onclick = openKahf;
+$("munjOpen").onclick = () => openReader("munj");
 $("kahfBack").onclick = () => history.back();
 $("kZoomIn").onclick = () => kZoom(2);
 $("kZoomOut").onclick = () => kZoom(-2);
