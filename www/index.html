@@ -1241,8 +1241,29 @@ function districtOf(pos) {
   districtCache.set(key, name);
   return name;
 }
-// «مسجد بلا اسم» يُعرض مع مقاطعته حتى يتميّز: «مسجد بلا اسم · عرفات»
-const mosqueLabel = m => m.name === "مسجد بلا اسم" ? `مسجد بلا اسم · ${districtOf(m)}` : m.name;
+// المساجد التي بلا اسم من الخريطة اسمها المؤقت «مسجد قرب X»: نُبقيه لأقربها إلى X فقط،
+// والباقي يُعرض «مسجد بلا اسم · المقاطعة» (مثل «مسجد بلا اسم · عرفات»). إن صحّح أحد الاسم يظهر كما كُتب.
+let nearLabelSrc = null, nearUnnamed = new Set();
+function unnamedNear() {
+  if (nearLabelSrc === baseMosques) return nearUnnamed;
+  nearLabelSrc = baseMosques; nearUnnamed = new Set();
+  const groups = new Map();
+  for (const m of baseMosques) {
+    const mm = /^مسجد قرب (.+)$/.exec(m.name || "");
+    if (mm && hasPos(m)) { if (!groups.has(mm[1])) groups.set(mm[1], []); groups.get(mm[1]).push(m); }
+  }
+  for (const [ref, arr] of groups) {
+    const refs = baseMosques.filter(x => x.name === ref && hasPos(x));
+    let best = null, bd = Infinity;
+    if (refs.length) for (const m of arr) {
+      const d = Math.min(...refs.map(r => distKm(m, r)));
+      if (d < bd) { bd = d; best = m; }
+    }
+    for (const m of arr) if (m !== best) nearUnnamed.add(m.id);
+  }
+  return nearUnnamed;
+}
+const mosqueLabel = m => m.name === "مسجد بلا اسم" || unnamedNear().has(m.id) ? `مسجد بلا اسم · ${districtOf(m)}` : m.name;
 let openGrps = new Set();
 function renderMosqueList() {
   const q = normAr($("mSearch") ? $("mSearch").value : "");
@@ -1267,7 +1288,7 @@ function renderMosqueList() {
       </div>`;
   let html = "";
   if (q) {
-    const found = all.filter(x => normAr(x.m.name).includes(q));
+    const found = all.filter(x => normAr(mosqueLabel(x.m)).includes(q));
     html = found.length ? found.map(row).join("") : '<div class="mEmpty">لا يوجد مسجد بهذا الاسم</div>';
   } else {
     const fav = all.filter(x => favs.includes(x.m.id));
