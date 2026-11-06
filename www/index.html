@@ -118,6 +118,15 @@
   /* سورة الكهف برواية ورش: خط مجمع الملك فهد */
   #kahfView { position:fixed; inset:0; background:var(--bg); z-index:10; display:flex; flex-direction:column; }
   #kahfView[hidden] { display:none; }
+  #tasbihView { position:fixed; inset:0; background:var(--bg); overflow:hidden; z-index:10; display:flex; flex-direction:column;
+                padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+  #tasbihView[hidden] { display:none; }
+  .tsbPhrase { display:flex; align-items:center; justify-content:center; text-align:center; font-size:34px !important; }
+  .tsbCount { width:130px !important; height:130px !important; }
+  .tsbCount b { font-size:2.4rem; }
+  .tsbChips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .tsbChips button { border:1px solid var(--hair); background:var(--card); color:var(--text); border-radius:999px; padding:8px 14px; font-size:.95rem; }
+  .tsbChips button.on { border-color:var(--accent); color:var(--accent); font-weight:700; }
   .kahfCard { flex:1; min-height:0; background:var(--card); border-radius:14px; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
   #kahfText { flex:1; min-height:0; overflow-y:auto; font-family:"Warsh",serif; font-size:26px; line-height:2.1; text-align:center; }
   #kahfText .basmala { color:var(--accent); margin-bottom:.3em; }
@@ -291,6 +300,9 @@
   .mrow.sel .radio::after { content:""; position:absolute; inset:3px; border-radius:50%; background:var(--accent); }
   .mrow .tag.on { background:var(--accent); color:#fff; }
   .mtimes .apx { opacity:.6; }
+  .mApprox { width:100%; text-align:start; border:none; background:var(--bg); border-radius:10px; padding:9px 12px; color:var(--muted); font-size:.85rem; line-height:1.5; }
+  .tChips { display:flex; flex-wrap:wrap; gap:4px 10px; margin:0 4px 4px; color:var(--muted); font-size:.85rem; }
+  .tChips span { white-space:nowrap; }
   .prRows label:last-child:nth-child(odd) { grid-column:1 / -1; }
   .prRows[hidden] { display:none; }
   .moreBtn { border:none; background:none; color:var(--accent); font-size:.85rem; padding:2px 4px 6px; align-self:flex-start; justify-self:start; }
@@ -333,6 +345,8 @@
     <button class="adhkarBtn" data-sec="morning"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><small>أذكار</small><span>الصباح</span><small class="prog" id="prog_morning"></small></button>
     <button class="adhkarBtn" data-sec="evening"><svg class="si" viewBox="0 0 24 24"><path d="M3 18h18M5 21h14"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M12 4v4M4.6 9.6l1.4 1.4M19.4 9.6L18 11"/></svg><small>أذكار</small><span>المساء</span><small class="prog" id="prog_evening"></small></button>
     <button class="adhkarBtn" data-sec="sleep"><svg class="si" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><small>أذكار</small><span>النوم</span><small class="prog" id="prog_sleep"></small></button>
+    <button class="adhkarBtn" data-sec="after"><svg class="si" viewBox="0 0 24 24"><path d="M12 3c-3 3-3 6 0 8 3-2 3-5 0-8z"/><path d="M5 21v-6a7 7 0 0 1 14 0v6M3 21h18"/></svg><small>أذكار</small><span>بعد الصلاة</span><small class="prog" id="prog_after"></small></button>
+    <button class="adhkarBtn" id="tasbihOpen"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="17" cy="9" r="2"/><circle cx="17" cy="15" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="7" cy="15" r="2"/><circle cx="7" cy="9" r="2"/></svg><small>عدّاد</small><span>السبحة</span><small class="prog" id="prog_tasbih"></small></button>
     <button class="adhkarBtn" id="kahfOpen"><svg class="si" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6M9 11h6"/></svg><small>سورة</small><span>الكهف</span><small class="prog" id="prog_kahf"></small></button>
   </div>
 </div>
@@ -376,7 +390,7 @@
       </select>
     </label>
     <div id="travelBox">
-      <div class="hint2" style="margin:0 4px 4px" id="travelSum"></div>
+      <div class="tChips" id="travelSum"></div>
       <button class="moreBtn" id="travelEdit">تعديل دقائق الإقامة في السفر ‹</button>
       <div class="prRows" id="travelRows" hidden></div>
     </div>
@@ -459,6 +473,22 @@
       <button class="soft" id="dhikrPrev">السابق</button>
       <button class="primary" id="dhikrNext">التالي</button>
     </div>
+  </div>
+</div>
+
+<div id="tasbihView" hidden>
+  <div class="adhkarHead">
+    <button class="backBtn" id="tasbihBack"><svg class="si" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>رجوع</button>
+    <div style="text-align:center"><h2>السبحة</h2><small id="tsbTotal"></small></div>
+    <button class="textBtn" id="tsbReset">تصفير</button>
+  </div>
+  <div class="pager">
+    <div class="dhikr" id="tsbCard">
+      <div class="txt tsbPhrase" id="tsbPhrase"></div>
+      <div class="counter tsbCount"><b id="tsbN">0</b><span id="tsbRound"></span></div>
+      <div class="hint">اضغط في أي مكان من البطاقة للعدّ</div>
+    </div>
+    <div class="tsbChips" id="tsbChips"></div>
   </div>
 </div>
 
@@ -654,12 +684,14 @@ function withApprox(m, list) {
   const near = hasPos(m) ? list.filter(x => x.id !== m.id && hasPos(x) && Array.isArray(x.prayers))
     .map(x => ({ x, d: distKm(m, x) })).filter(o => o.d <= APPROX_KM).sort((a, b) => a.d - b.d) : [];
   const t = hasPos(m) ? prayerTimesFor(new Date(), m.lat, m.lng) : null, off = settings.travelOff;
+  let approxFrom = "";
   const prayers = m.prayers.map((p, i) => {
     if (!p.approx) return p;
     const src = near.find(o => o.x.prayers[i] && !o.x.prayers[i].approx);
     const q = { ...p }; delete q.after_sunset;
     if (src) {
       const sp = src.x.prayers[i];
+      approxFrom = approxFrom || src.x.name;
       q.iqama = sp.iqama;
       if (typeof sp.after_sunset === "number") q.after_sunset = sp.after_sunset;
     } else if (t && t[PKEYS[i]] !== null) {
@@ -673,7 +705,7 @@ function withApprox(m, list) {
     const src = near.find(o => o.x.prayers[1] && !o.x.prayers[1].jumuah_approx && validTime(o.x.jumuah));
     jumuah = src ? src.x.jumuah : prayers[1].iqama;
   }
-  return { ...m, prayers, jumuah, jumApprox: unkJ };
+  return { ...m, prayers, jumuah, jumApprox: unkJ, approxFrom };
 }
 // مسجد كل أوقاته تقريبية (مثل المساجد المأخوذة من الخريطة دون أوقات)
 const allApprox = m => !!(m && (m.prayers || []).every(p => p.approx));
@@ -727,6 +759,7 @@ function prayerTimesFor(date, lat, lng) {
            maghrib: r(noon + ha(-0.833)), isha: r(noon + ha(-17)) };
 }
 const TRAVEL_KM = 10;
+const SWITCH_KM = 0.15;
 function travelMosque(pos, date = new Date()) {
   const t = prayerTimesFor(date, pos.lat, pos.lng), off = settings.travelOff;
   const mk = (name, k) => ({ name, adhan: hhmm(t[k]), iqama: hhmm(t[k] + off[k]) });
@@ -798,6 +831,12 @@ function pickMosque() {
     for (const m of list) if (hasPos(m)) {
       const d = distKm(here, m);
       if (!best || d < best.d) best = { m, d };
+    }
+    // لا ننتقل من المسجد الحالي إلا إذا صار غيره أقرب منه بـ150 م على الأقل، فتذبذب الموقع لا يبدّل المسجد ذهاباً وإياباً
+    const prev = currentWhy === "near" && current ? list.find(x => x.id === current.id && hasPos(x)) : null;
+    if (prev && best && prev.id !== best.m.id) {
+      const dp = distKm(here, prev);
+      if (dp - best.d < SWITCH_KM) best = { m: prev, d: dp };
     }
     // بعيد عن كل المساجد المسجّلة: وضع السفر (أوقات محسوبة لموقعك)
     if (settings.travel !== "off" && (!best || best.d > TRAVEL_KM)) return { m: travelMosque(here), why: "travel", d: best ? best.d : null };
@@ -1162,7 +1201,7 @@ function renderMosquePage(id) {
   const isMine = current && current.id === m.id;
   $("sheetTitle").textContent = m.name;
   $("sheetBody").innerHTML = `
-    ${d !== null ? `<div class="subline"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> على بعد ${fmtDist(d)} منك</div>` : ""}
+    ${d !== null ? `<div class="subline"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> على بعد ${fmtDist(d)} منك · ${escapeHtml(districtOf(m))}</div>` : (hasPos(m) ? `<div class="subline">${escapeHtml(districtOf(m))}</div>` : "")}
     <div class="plist">${list.map((p, i) => i === nextI
       ? `<div class="pit next"><span class="n">${p.name}</span><span class="t">${ap(p)}${fmt12(p.iqama)}</span>
          <div class="cd"><span>الإقامة القادمة</span><span>${arDuration(Math.max(0, Math.ceil((nextT - now) / 60000)))}</span></div></div>`
@@ -1205,7 +1244,7 @@ function renderSheet() {
     <div class="mrow auto ${choice.mode === "auto" ? "sel" : ""}" data-auto="1">
       <div class="info"><div class="nm"><svg class="si" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> تلقائي: الأقرب إليّ</div>
       <div class="sub">${choice.mode === "auto" ? "مُفعّل · " : ""}يختار التطبيق أقرب مسجد كلما فتحته</div></div><span class="radio"></span></div>
-    <input class="mSearch" id="mSearch" type="search" placeholder="ابحث عن مسجد بالاسم" autocomplete="off">
+    <input class="mSearch" id="mSearch" type="search" placeholder="ابحث باسم المسجد أو المقاطعة" autocomplete="off">
     <div id="mList" style="display:flex;flex-direction:column;gap:10px"></div>
     <button class="bigBtn soft" id="addHere">+ أضف مسجداً في موقعي الحالي</button>
     <div class="form"><div class="msg" id="sheetMsg"></div></div>`;
@@ -1283,8 +1322,9 @@ function renderMosqueList() {
           ${hasPos(m) ? `<button class="ib" data-go="${escapeHtml(m.id)}" aria-label="الطريق"><svg class="si" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></button>` : ""}
           <button class="ib" data-edit="${escapeHtml(m.id)}" aria-label="تعديل"><svg class="si" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
         </div>
+        ${allApprox(m) ? `<button class="mApprox" data-edit="${escapeHtml(m.id)}">أوقات غير معروفة · تقريباً ${m.approxFrom ? "مثل " + escapeHtml(shortName(m.approxFrom)) : "محسوبة"} · أضِفها ‹</button>` : `
         <div class="mtimes">${m.prayers.map((p, i) => { const fj = fri && i === 1 && m.jumuah, ap = fj ? m.jumApprox : p.approx;
-          return `<span class="${ap ? "apx" : ""}"><small>${PN[i]}</small>${ap ? "~" : ""}${t12(fj ? m.jumuah : p.iqama)}</span>`; }).join("")}</div>
+          return `<span class="${ap ? "apx" : ""}"><small>${PN[i]}</small>${ap ? "~" : ""}${t12(fj ? m.jumuah : p.iqama)}</span>`; }).join("")}</div>`}
       </div>`;
   let html = "";
   if (q) {
@@ -1346,7 +1386,8 @@ async function sheetClick(e) {
   const row = t.closest && t.closest(".mrow");
   if (!row) return;
   if (row.dataset.auto) return chooseMosque({ mode: "auto" });
-  chooseMosque({ mode: "fixed", id: row.dataset.id });
+  // الضغط على مسجد يفتح صفحته فقط؛ الاختيار بزر «اجعله مسجدي» (حتى لا تغيّره ضغطة خاطئة أثناء التمرير)
+  openMosquePage(row.dataset.id);
 }
 $("sheetBody").addEventListener("click", sheetClick);
 $("mlBody").addEventListener("click", sheetClick);
@@ -1693,7 +1734,7 @@ function renderTravelRows() {
   const N = { fajr: "الفجر", dhuhr: "الظهر", asr: "العصر", maghrib: "المغرب", isha: "العشاء" };
   $("travelRows").innerHTML = Object.keys(N).map(k => `<label>${N[k]}<select data-tk="${k}">${[0, 5, 10, 15, 20, 25, 30].map(o =>
     `<option value="${o}" ${o === settings.travelOff[k] ? "selected" : ""}>+${o} د</option>`).join("")}</select></label>`).join("");
-  $("travelSum").textContent = "الإقامة بعد الأذان (تقريبية): " + Object.keys(N).map(k => `${N[k]} ${settings.travelOff[k]}`).join(" · ") + " د";
+  $("travelSum").innerHTML = '<div style="width:100%">الإقامة بعد الأذان في السفر (بالدقائق، تقريبية):</div>' + Object.keys(N).map(k => `<span>${N[k]} ${settings.travelOff[k]}</span>`).join("");
 }
 $("travelEdit").onclick = () => { const r = $("travelRows"); r.hidden = !r.hidden; $("travelEdit").textContent = r.hidden ? "تعديل دقائق الإقامة في السفر ‹" : "إخفاء ⌄"; };
 function renderPrayerRows() {
@@ -1777,22 +1818,29 @@ $("exactBtn").onclick = async () => {
 
 // ---------- الأذكار: الصباح والمساء والنوم ----------
 // اضغط على الذكر ليُنقص العدد حتى يكتمل. تقدّم كل قسم يُحفظ لليوم نفسه ويبدأ من جديد في اليوم التالي.
-const SECTION_TITLES = { morning: "أذكار الصباح", evening: "أذكار المساء", sleep: "أذكار النوم" };
+const SECTION_TITLES = { morning: "أذكار الصباح", evening: "أذكار المساء", sleep: "أذكار النوم", after: "أذكار بعد الصلاة" };
+// أذكار بعد الصلاة تبدأ من جديد بعد كل إقامة؛ والباقي مرة في اليوم
+function lastIqamaIndex(now = new Date()) {
+  let k = -1;
+  (cfg && cfg.prayers || []).forEach((p, i) => { if (toDate(p.iqama, now) <= now) k = i; });
+  return k;
+}
+function periodKey(sec) { return sec === "after" ? todayKey() + "#" + lastIqamaIndex() : todayKey(); }
 let allAdhkar = null;
 let section = "evening";
 let adhkar = [];
 const todayKey = () => new Date().toDateString();
 function loadDone() {
   const saved = store.get("adhkarDone_" + section, null);
-  return saved && saved.day === todayKey() ? saved.counts : {};
+  return saved && saved.day === periodKey(section) ? saved.counts : {};
 }
 let done = {};
-function saveDone() { store.set("adhkarDone_" + section, { day: todayKey(), counts: done }); }
+function saveDone() { store.set("adhkarDone_" + section, { day: periodKey(section), counts: done }); }
 let page = 0;
 function leftOf(i) { return adhkar[i].n - Math.min(done[i] || 0, adhkar[i].n); }
 function renderAdhkar() {
   $("dhikrHint").hidden = !!store.get("dhikrHintSeen", false);
-  if ((store.get("adhkarDone_" + section, {}) || {}).day !== todayKey()) done = {};
+  if ((store.get("adhkarDone_" + section, {}) || {}).day !== periodKey(section)) done = {};
   if (!adhkar.length) { $("dhikrText").textContent = "تعذّر تحميل الأذكار."; return; }
   page = Math.max(0, Math.min(page, adhkar.length - 1));
   const d = adhkar[page], left = leftOf(page);
@@ -1850,7 +1898,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitText);
 if (document.fonts) document.fonts.addEventListener && document.fonts.addEventListener("loadingdone", fitText);
 function goTo(i) {
   if (i < 0 || i >= adhkar.length) return;
-  page = i; store.set("adhkarPage_" + section, { day: todayKey(), page });
+  page = i; store.set("adhkarPage_" + section, { day: periodKey(section), page });
   renderAdhkar();
 }
 let advanceTimer = null;
@@ -1886,7 +1934,7 @@ async function openAdhkar(sec) {
   done = loadDone();
   $("adhkarTitle").textContent = SECTION_TITLES[sec];
   const savedPage = store.get("adhkarPage_" + sec, null);
-  page = savedPage && savedPage.day === todayKey() ? savedPage.page : 0;
+  page = savedPage && savedPage.day === periodKey(sec) ? savedPage.page : 0;
   $("adhkarView").hidden = false;
   renderAdhkar();
   try { await document.fonts.load('26px "Hafs"'); } catch {}
@@ -1897,8 +1945,8 @@ document.querySelectorAll(".adhkarBtn[data-sec]").forEach(b => { b.onclick = () 
 $("adhkarBack").onclick = () => history.back();
 // زر الرجوع في الجوال يغلق صفحة الأذكار بدل إغلاق التطبيق
 window.addEventListener("popstate", () => {
-  const overlay = !$("adhkarView").hidden || !$("sheet").hidden || !$("kahfView").hidden;
-  closeAdhkar(); closeSheet(); closeKahf();
+  const overlay = !$("adhkarView").hidden || !$("sheet").hidden || !$("kahfView").hidden || !$("tasbihView").hidden;
+  closeAdhkar(); closeSheet(); closeKahf(); closeTasbih();
   if (!overlay && tab !== "home") showTab("home", false);
   else if (tab === "adhkar") renderAdhkarTiles();
   else if (tab === "home") updateSmart();
@@ -1911,7 +1959,7 @@ async function loadAdhkarData() {
 function adhkarProgress(sec) {
   const list = (allAdhkar || {})[sec] || [];
   const saved = store.get("adhkarDone_" + sec, null);
-  const counts = saved && saved.day === todayKey() ? saved.counts : {};
+  const counts = saved && saved.day === periodKey(sec) ? saved.counts : {};
   const fin = list.filter((d, i) => (counts[i] || 0) >= d.n).length;
   return { fin, total: list.length, started: Object.keys(counts).length > 0 };
 }
@@ -1920,6 +1968,9 @@ const progText = p => !p.total ? "" : p.fin >= p.total ? "✓ أكملتها ا�
 function suggestNow() {
   const now = new Date(), P = cfg.prayers, at = i => toDate(P[i].iqama, now);
   const out = [];
+  // بعد كل إقامة بـ5 إلى 40 دقيقة: أذكار بعد الصلاة (إن لم تكتمل)
+  const li = lastIqamaIndex(now), sinceIq = li >= 0 ? (now - at(li)) / 60000 : -1;
+  if (sinceIq >= 5 && sinceIq <= 40 && adhkarProgress("after").fin < adhkarProgress("after").total) out.push("after");
   if (now.getDay() === 5 && now < at(3) && (store.get("kahfPos", 0) || 0) < 0.97) out.push("kahf");
   if (now >= at(0) && now < at(1)) out.push("morning");
   else if (now >= at(2) && now < at(4)) out.push("evening");
@@ -1929,12 +1980,14 @@ function suggestNow() {
 async function renderAdhkarTiles() {
   await loadAdhkarData();
   const sug = suggestNow();
-  for (const sec of ["morning", "evening", "sleep"]) $("prog_" + sec).textContent = progText(adhkarProgress(sec));
+  for (const sec of ["morning", "evening", "sleep", "after"]) $("prog_" + sec).textContent = progText(adhkarProgress(sec));
+  const tc = store.get("tasbih", { n: 0 }).n || 0;
+  $("prog_tasbih").textContent = tc ? `العدد ${tc}` : "عدّ حر";
   const kp = Math.round((store.get("kahfPos", 0) || 0) * 100);
   $("prog_kahf").textContent = kp >= 97 ? "✓ قرأتها" : kp > 0 ? `قرأت ${kp}%` : "رواية ورش";
-  document.querySelectorAll("#pgAdhkar .adhkarBtn").forEach(b => b.classList.toggle("now", sug.includes(b.dataset.sec || "kahf")));
+  document.querySelectorAll("#pgAdhkar .adhkarBtn").forEach(b => b.classList.toggle("now", sug.includes(b.dataset.sec || (b.id === "kahfOpen" ? "kahf" : ""))));
 }
-const SMART = { morning: ["أذكار الصباح", "sun"], evening: ["أذكار المساء", "sunset"], sleep: ["أذكار النوم", "moon"], kahf: ["سورة الكهف · يوم الجمعة", "book"] };
+const SMART = { after: ["أذكار بعد الصلاة", "mosque"], morning: ["أذكار الصباح", "sun"], evening: ["أذكار المساء", "sunset"], sleep: ["أذكار النوم", "moon"], kahf: ["سورة الكهف · يوم الجمعة", "book"] };
 async function updateSmart() {
   await loadAdhkarData();
   const sec = suggestNow().find(x => x === "kahf" || adhkarProgress(x).fin < adhkarProgress(x).total);
@@ -2017,7 +2070,38 @@ $("kahfOpen").onclick = openKahf;
 $("kahfBack").onclick = () => history.back();
 $("kZoomIn").onclick = () => kZoom(2);
 $("kZoomOut").onclick = () => kZoom(-2);
-$("adhkarReset").onclick = () => { done = {}; saveDone(); goTo(0); };
+$("adhkarReset").onclick = () => {
+  if (!confirm(`إعادة ${SECTION_TITLES[section]} من البداية؟`)) return;
+  done = {}; saveDone(); goTo(0);
+};
+// ---------- السبحة: عدّاد حر يُحفظ، مع اختيار الذكر ----------
+const TSB_PHRASES = ["سُبْحَانَ اللَّهِ", "الْحَمْدُ لِلَّهِ", "اللَّهُ أَكْبَرُ", "لَا إِلَٰهَ إِلَّا اللَّهُ", "أَسْتَغْفِرُ اللَّهَ", "اللَّهُمَّ صَلِّ عَلَىٰ مُحَمَّدٍ"];
+function tsbState() { const t = store.get("tasbih", null) || {}; return { n: t.n || 0, total: t.total || 0, ph: t.ph || 0 }; }
+function renderTasbih() {
+  const t = tsbState();
+  $("tsbPhrase").textContent = TSB_PHRASES[t.ph] || TSB_PHRASES[0];
+  $("tsbN").textContent = t.n;
+  $("tsbRound").textContent = t.n >= 33 ? `${Math.floor(t.n / 33)} × 33` : "تسبيحة";
+  $("tsbTotal").textContent = t.total ? `المجموع ${t.total}` : "";
+  $("tsbChips").innerHTML = TSB_PHRASES.map((p, i) => `<button class="${i === t.ph ? "on" : ""}" data-ph="${i}">${p}</button>`).join("");
+  $("tsbPhrase").style.fontFamily = '"Hafs","AmiriQuran",serif';
+}
+function openTasbih() { $("tasbihView").hidden = false; renderTasbih(); history.pushState({ tasbih: true }, ""); }
+function closeTasbih() { $("tasbihView").hidden = true; }
+$("tasbihOpen").onclick = openTasbih;
+$("tasbihBack").onclick = () => history.back();
+$("tsbCard").addEventListener("click", () => {
+  const t = tsbState(); t.n++; t.total++; store.set("tasbih", t); renderTasbih();
+  try { navigator.vibrate && navigator.vibrate(t.n % 33 === 0 ? 80 : 12); } catch {}
+});
+$("tsbChips").addEventListener("click", e => {
+  const b = e.target.closest("[data-ph]"); if (!b) return;
+  const t = tsbState(); t.ph = +b.dataset.ph; t.n = 0; store.set("tasbih", t); renderTasbih();
+});
+$("tsbReset").onclick = () => {
+  if (!tsbState().n || !confirm("تصفير العدّاد؟")) return;
+  const t = tsbState(); t.n = 0; store.set("tasbih", t); renderTasbih();
+};
 
 // ---------- رقم النسخة والتحديث ----------
 // version.json يكتبه البناء التلقائي: رقم النسخة ومستوى النظام الداخلي الذي تحتاجه هذه الواجهة.
