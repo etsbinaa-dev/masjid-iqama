@@ -821,7 +821,7 @@ function prayerTimesFor(date, lat, lng) {
            maghrib: r(noon + ha(-0.833)), isha: r(noon + ha(-17)) };
 }
 const TRAVEL_KM = 10;
-const SWITCH_KM = 0.15;
+const SWITCH_KM = 0.04;
 function travelMosque(pos, date = new Date()) {
   const t = prayerTimesFor(date, pos.lat, pos.lng), off = settings.travelOff;
   const mk = (name, k) => ({ name, adhan: hhmm(t[k]), iqama: hhmm(t[k] + off[k]) });
@@ -894,7 +894,7 @@ function pickMosque() {
       const d = distKm(here, m);
       if (!best || d < best.d) best = { m, d };
     }
-    // لا ننتقل من المسجد الحالي إلا إذا صار غيره أقرب منه بـ150 م على الأقل، فتذبذب الموقع لا يبدّل المسجد ذهاباً وإياباً
+    // لا ننتقل من المسجد الحالي إلا إذا صار غيره أقرب منه بـ40 م على الأقل، فتذبذب الموقع لا يبدّل المسجد ذهاباً وإياباً
     const prev = currentWhy === "near" && current ? list.find(x => x.id === current.id && hasPos(x)) : null;
     if (prev && best && prev.id !== best.m.id) {
       const dp = distKm(here, prev);
