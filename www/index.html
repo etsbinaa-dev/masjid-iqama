@@ -28,6 +28,9 @@
   .bgLoc { display:block; margin:8px auto 0; padding:8px 12px; font-size:.85rem; line-height:1.6; border-radius:10px;
            background:transparent; color:var(--accent); border:1px dashed var(--accent); }
   .bgLoc[hidden] { display:none; }
+  .ptr { position:fixed; top:0; left:0; right:0; z-index:6; text-align:center; font-size:.85rem; color:var(--accent);
+         background:var(--bg); padding:10px 0; box-shadow:0 2px 8px rgba(0,0,0,.08); transition:opacity .2s; }
+  .ptr[hidden] { display:none; }
   .whereGo { padding:0 6px; border:none; font-size:.85rem; font-weight:700; }
   .whereGo[hidden], .nearBtn[hidden] { display:none; }
   .approxHint { display:block; margin:2px auto 6px; border:none; background:none; color:var(--accent); font-size:.85rem; text-align:center; }
@@ -337,6 +340,7 @@
     <button class="bgLoc" id="bgLocBtn" hidden>📍 ليتغيّر المسجد تلقائياً وأنت خارج التطبيق: اسمح بالموقع «طوال الوقت»</button>
   </div>
   <button class="updateBar" id="updateBar" hidden></button>
+  <div class="ptr" id="ptr" hidden></div>
   <button class="updateBar adminBar" id="adminBar" hidden></button>
   <div class="plist" id="list"></div>
   <div class="subline" style="justify-content:center"><span id="jumuahLine"></span></div>
@@ -1036,23 +1040,44 @@ function getPosition() {
       reject, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60 * 1000 });
   });
 }
+// يعتمد موقعاً جديداً: يتجاهل الرديء جداً، ولا يعيد اختيار المسجد إلا إذا تحرّكت 15 م أو صار الموقع أدق
+function usePosition(pos, force) {
+  // موقع رديء جداً (خطأ أكثر من 5 كم) لا نعتمده إن كان عندنا موقع أدق منه
+  if (pos.acc > 5000 && here && here.acc && here.acc < pos.acc) {
+    $("accWarn").textContent = "تعذّر تحديد موقعك بدقة الآن، فأبقينا آخر موقع دقيق. فعّل GPS و«الموقع الدقيق».";
+    $("accWarn").hidden = false; return;
+  }
+  const moved = !here ? Infinity : distKm(here, pos) * 1000;
+  if (!force && moved < 15 && !(here.acc && pos.acc < here.acc / 2)) return;
+  here = pos;
+  store.set("lastPos", here);
+  applyMosque();
+  if (tab === "mosques" && $("sheet").hidden) renderMosqueList();
+  // موقع تقريبي (إذن "الموقع التقريبي" أو دون GPS): ننبّه لأن اختيار الأقرب قد يخطئ
+  $("accWarn").hidden = !(here.acc > 500);
+  $("accWarn").textContent = `موقعك تقريبي (± ${fmtDist(here.acc / 1000)})، فقد يخطئ اختيار الأقرب. فعّل «الموقع الدقيق» للتطبيق من إعدادات الجوال.`;
+}
 async function locate() {
   try {
-    const pos = await getPosition();
-    // موقع رديء جداً (خطأ أكثر من 5 كم) لا نعتمده إن كان عندنا موقع أدق منه
-    if (pos.acc > 5000 && here && here.acc && here.acc < pos.acc) {
-      $("accWarn").textContent = "تعذّر تحديد موقعك بدقة الآن، فأبقينا آخر موقع دقيق. فعّل GPS و«الموقع الدقيق».";
-      $("accWarn").hidden = false; return;
-    }
-    here = pos;
-    store.set("lastPos", here);
-    applyMosque();
-    // موقع تقريبي (إذن "الموقع التقريبي" أو دون GPS): ننبّه لأن اختيار الأقرب قد يخطئ
-    $("accWarn").hidden = !(here.acc > 500);
-    $("accWarn").textContent = `موقعك تقريبي (± ${fmtDist(here.acc / 1000)})، فقد يخطئ اختيار الأقرب. فعّل «الموقع الدقيق» للتطبيق من إعدادات الجوال.`;
+    usePosition(await getPosition(), true);
   } catch {
     if (!here) $("nearName").textContent = "فعّل الموقع (GPS) ثم اضغط هنا";
   }
+}
+// متابعة الموقع ما دام التطبيق أمامك، فيتغيّر المسجد وحده أثناء مشيك؛ وتتوقف عند الخروج منه حفاظاً على البطارية
+let watchId = null;
+function startWatch() {
+  if (watchId !== null || !navigator.geolocation) return;
+  try {
+    watchId = navigator.geolocation.watchPosition(
+      p => usePosition({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy || 0) }),
+      () => {}, { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
+  } catch { watchId = null; }
+}
+function stopWatch() {
+  if (watchId === null) return;
+  try { navigator.geolocation.clearWatch(watchId); } catch {}
+  watchId = null;
 }
 
 // ---------- مشاركة المساجد مع الجميع (اقتراح يراجعه صاحب التطبيق) ----------
@@ -2365,14 +2390,39 @@ scheduleAll();
 refreshMosques();
 renderAdmin();
 loadPending();
-locate();
+locate().then(startWatch);
 checkUpdate();
 updateSmart();
+// السحب للأسفل في الرئيسية: يعيد تحديد الموقع وتحميل المساجد والأوقات
+let ptrY = null, ptrDy = 0, ptrBusy = false;
+const PTR_PULL = 110;
+const overlayOpen = () => !$("sheet").hidden || !$("adhkarView").hidden || !$("kahfView").hidden || !$("tasbihView").hidden;
+document.addEventListener("touchstart", e => {
+  ptrY = tab === "home" && !ptrBusy && !overlayOpen() && window.scrollY <= 0 ? e.touches[0].clientY : null; ptrDy = 0;
+}, { passive: true });
+document.addEventListener("touchmove", e => {
+  if (ptrY === null) return;
+  ptrDy = e.touches[0].clientY - ptrY;
+  if (ptrDy < 15) { $("ptr").hidden = true; return; }
+  $("ptr").hidden = false;
+  $("ptr").textContent = ptrDy >= PTR_PULL ? "أفلت للتحديث ↻" : "اسحب للأسفل للتحديث ↓";
+  $("ptr").style.opacity = Math.min(1, ptrDy / PTR_PULL);
+}, { passive: true });
+document.addEventListener("touchend", async () => {
+  if (ptrY === null) return;
+  const go = ptrDy >= PTR_PULL; ptrY = null;
+  if (!go) { $("ptr").hidden = true; return; }
+  ptrBusy = true;
+  $("ptr").style.opacity = 1; $("ptr").textContent = "جارٍ تحديد موقعك وتحديث الأوقات…";
+  try { await Promise.all([locate(), refreshMosques()]); $("ptr").textContent = "تم التحديث ✓"; }
+  catch { $("ptr").textContent = "تعذّر التحديث، تحقق من الإنترنت والموقع"; }
+  setTimeout(() => { $("ptr").hidden = true; ptrBusy = false; }, 1200);
+}, { passive: true });
 // عند الرجوع إلى التطبيق (دون إغلاقه) نبحث أيضاً عن تحديث، مرة كل 10 دقائق على الأكثر
 let lastUpdateCheck = Date.now();
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) return;
-  refreshMosques(); locate(); refreshBgLoc(); loadPending();
+  if (document.hidden) { stopWatch(); return; }
+  refreshMosques(); locate(); startWatch(); refreshBgLoc(); loadPending();
   if (Date.now() - lastUpdateCheck > 2 * 60 * 1000) { lastUpdateCheck = Date.now(); checkUpdate(); }
 });
 </script>
