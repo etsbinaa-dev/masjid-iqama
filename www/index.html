@@ -397,6 +397,14 @@
         <option value="vibrate">اهتزاز فقط</option>
       </select>
     </label>
+    <label for="snoozeSel" id="snoozeRow" hidden>زر «ذكّرني» في الإشعار
+      <select id="snoozeSel">
+        <option value="3">بعد 3 دقائق</option>
+        <option value="5">بعد 5 دقائق</option>
+        <option value="10">بعد 10 دقائق</option>
+        <option value="0">بلا زر</option>
+      </select>
+    </label>
     <div id="fajrSoundBox" hidden>
       <label for="fajrSoundSel">صوت الفجر
         <select id="fajrSoundSel">
@@ -576,6 +584,7 @@ if (settings.adhkarRemind === undefined) settings.adhkarRemind = true;
 if (settings.hijriAdj === undefined) settings.hijriAdj = 0;
 if (!settings.sound) settings.sound = "hayya";
 if (!settings.fajrSound) settings.fajrSound = "same";
+if (settings.snoozeMin === undefined) settings.snoozeMin = 5;
 if (settings.fridayRemind === undefined) settings.fridayRemind = true;
 if (!settings.fontPx) settings.fontPx = 16;
 if (!settings.travel) settings.travel = "auto";
@@ -1751,6 +1760,7 @@ function buildAlarms(c = cfg) {
       id, hour: at.hour, minute: at.minute, weekday: weekday || 0,
       iq: Number(iqama.split(":")[0]) * 60 + Number(iqama.split(":")[1]),   // وقت الإقامة بالدقائق (لموعد فحص الموقع)
       sound: id === 1 && fajrAdhanReady ? "file:" + FAJR_ADHAN : settings.sound,
+      snooze: settings.snoozeMin,   // زر «ذكّرني بعد N د» في الإشعار (0 = بلا زر)
       title: `إقامة ${name} بعد ${minsWord(n)}`,
       body: `${from ? from.name : c.mosqueName} — الإقامة ${approx ? "~" : ""}${fmt12(iqama)}${approx ? " (تقريبية)" : ""}`
     });
@@ -1954,6 +1964,10 @@ $("fajrTest").onclick = async () => {
   try { await Alarm.test({ seconds: 1, sound: "file:" + FAJR_ADHAN, title: "تجربة الأذان", body: "اضغط «إيقاف الأذان» أو زر الصوت لإيقافه" }); } catch {}
 };
 fajrAdhanAvailable().then(ok => { $("fajrSoundBox").hidden = !ok; });
+// زر «ذكّرني» يحتاج النظام الداخلي 6 أو أحدث (فيه features)
+$("snoozeSel").value = String(settings.snoozeMin);
+$("snoozeSel").onchange = e => { settings.snoozeMin = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
+if (Alarm) Alarm.features().then(f => { $("snoozeRow").hidden = !(f && f.snooze); }).catch(() => {});
 $("soundSel").value = settings.sound;
 $("soundSel").onchange = e => { settings.sound = e.target.value; store.set("settings", settings); scheduleAll(); };
 $("fridayRemind").checked = settings.fridayRemind;

@@ -30,6 +30,8 @@ import org.json.JSONObject;
 public class AlarmReceiver extends BroadcastReceiver {
 
     static final String ACTION_STOP = "org.masjid.iqama.IQAMA_STOP";
+    static final String ACTION_SNOOZE = "org.masjid.iqama.IQAMA_SNOOZE";
+    static final String EXTRA_NID = "nid";
     private static final String CHANNEL_ID = "iqama_silent";
     private static final long MAX_PLAY_MS = 15000;
 
@@ -44,6 +46,15 @@ public class AlarmReceiver extends BroadcastReceiver {
         Context c = context.getApplicationContext();
         if (ACTION_STOP.equals(intent.getAction())) {
             stopSound();
+            return;
+        }
+        // «ذكّرني بعد N د»: يوقف الصوت ويخفي الإشعار ويجدول تنبيهاً واحداً بعد N دقائق
+        if (ACTION_SNOOZE.equals(intent.getAction())) {
+            stopSound();
+            try {
+                NotificationManagerCompat.from(c).cancel(intent.getIntExtra(EXTRA_NID, 0));
+                snooze(c, new JSONObject(intent.getStringExtra(IqamaAlarms.EXTRA_ALARM)));
+            } catch (Exception ignored) {}
             return;
         }
         JSONObject a;
@@ -70,12 +81,35 @@ public class AlarmReceiver extends BroadcastReceiver {
         // صوت طويل من ملف (مثل الأذان كاملاً للفجر): تشغّله خدمة أمامية بإشعارها الخاص.
         // إن لم يوجد الملف أو تعذّر بدء الخدمة نرجع إلى «حي على الصلاة»
         if (sound.startsWith("file:")) {
-            if (AdhanService.start(c, sound.substring(5), a.optString("title"), a.optString("body"))) return;
+            if (AdhanService.start(c, sound.substring(5), a)) return;
             sound = "hayya";
         }
         showNotification(c, a);
         // الصوت المختار في الإعدادات: hayya (حي على الصلاة) أو chime (جرس) أو vibrate (اهتزاز فقط)
         playSound(c, goAsync(), sound);
+    }
+
+    /** تنبيه واحد (لا يتكرر) بعد عدد الدقائق المختار، برقم مختلف حتى لا يلغي التنبيه اليومي. */
+    static void snooze(Context c, JSONObject a) throws Exception {
+        int mins = Math.max(1, a.optInt("snooze", 5));
+        JSONObject s = new JSONObject(a.toString());
+        s.put("id", 5000 + (a.optInt("id") % 5000));
+        s.put("repeat", false);
+        s.put("check", false);
+        String title = a.optString("title").replaceFirst("^تذكير: ", "");
+        s.put("title", "تذكير: " + title);
+        IqamaAlarms.setAlarm(c, s, System.currentTimeMillis() + mins * 60_000L);
+    }
+
+    /** زر «ذكّرني بعد N د» لإشعار تنبيه (يستعمله الإشعار العادي وإشعار الأذان). */
+    static void addSnoozeAction(Context c, NotificationCompat.Builder b, JSONObject a, int nid) {
+        int mins = a.optInt("snooze", 5);
+        if (mins <= 0) return;
+        Intent i = new Intent(c, AlarmReceiver.class).setAction(ACTION_SNOOZE)
+            .putExtra(IqamaAlarms.EXTRA_ALARM, a.toString()).putExtra(EXTRA_NID, nid);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = PendingIntent.getBroadcast(c, 2000 + (a.optInt("id") % 5000), i, flags);
+        b.addAction(0, "ذكّرني بعد " + mins + " د", pi);
     }
 
     private static Vibrator vibrator;
@@ -196,6 +230,7 @@ public class AlarmReceiver extends BroadcastReceiver {
             .setContentIntent(openPi)
             .setDeleteIntent(stopPi)
             .addAction(0, "إيقاف الصوت", stopPi);
+        addSnoozeAction(c, b, a, a.optInt("id"));
         try {
             NotificationManagerCompat.from(c).notify(a.optInt("id"), b.build());
         } catch (SecurityException ignored) {}

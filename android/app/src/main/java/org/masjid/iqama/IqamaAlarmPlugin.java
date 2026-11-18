@@ -44,6 +44,7 @@ public class IqamaAlarmPlugin extends Plugin {
             a.put("body", call.getString("body", ""));
             a.put("repeat", false);
             a.put("sound", call.getString("sound", "hayya"));
+            a.put("snooze", call.getInt("snooze", 5));
             long at = System.currentTimeMillis() + call.getInt("seconds", 5) * 1000L;
             IqamaAlarms.setAlarm(getContext(), a, at);
             call.resolve();
@@ -122,6 +123,14 @@ public class IqamaAlarmPlugin extends Plugin {
         JSObject r = new JSObject();
         java.io.File f = name.matches("[A-Za-z0-9_.-]{1,64}") ? AdhanService.soundFile(getContext(), name) : null;
         r.put("size", f != null && f.exists() ? f.length() : 0);
+        call.resolve(r);
+    }
+
+    /** ما يدعمه هذا النظام الداخلي، لتُظهر الواجهة الإعدادات المناسبة. */
+    @PluginMethod
+    public void features(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("snooze", true);
         call.resolve(r);
     }
 

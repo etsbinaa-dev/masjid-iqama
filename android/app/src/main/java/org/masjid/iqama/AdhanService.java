@@ -33,6 +33,7 @@ public class AdhanService extends Service {
     static final String EXTRA_FILE = "file";
     static final String EXTRA_TITLE = "title";
     static final String EXTRA_BODY = "body";
+    static final String EXTRA_ALARM = "alarm";
     static final String ACTION_STOP = "org.masjid.iqama.ADHAN_STOP";
     private static final String CHANNEL_ID = "iqama_silent";
     private static final int NOTIF_ID = 777;
@@ -59,11 +60,12 @@ public class AdhanService extends Service {
     }
 
     /** يبدأ تشغيل الملف؛ يرجع false إن لم يوجد الملف أو رفض النظام بدء الخدمة. */
-    static boolean start(Context c, String file, String title, String body) {
+    static boolean start(Context c, String file, org.json.JSONObject a) {
         if (!soundFile(c, file).exists()) return false;
         try {
-            Intent i = new Intent(c, AdhanService.class)
-                .putExtra(EXTRA_FILE, file).putExtra(EXTRA_TITLE, title).putExtra(EXTRA_BODY, body);
+            Intent i = new Intent(c, AdhanService.class).putExtra(EXTRA_FILE, file)
+                .putExtra(EXTRA_TITLE, a.optString("title")).putExtra(EXTRA_BODY, a.optString("body"))
+                .putExtra(EXTRA_ALARM, a.toString());
             ContextCompat.startForegroundService(c, i);
             return true;
         } catch (Exception e) {
@@ -88,7 +90,7 @@ public class AdhanService extends Service {
         String body = intent.getStringExtra(EXTRA_BODY);
         try {
             int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ? ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK : 0;
-            ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(title, body), type);
+            ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(title, body, intent.getStringExtra(EXTRA_ALARM)), type);
         } catch (Exception e) {
             stopSelf();
             return START_NOT_STICKY;
@@ -127,7 +129,7 @@ public class AdhanService extends Service {
         }
     }
 
-    private Notification buildNotification(String title, String body) {
+    private Notification buildNotification(String title, String body, String alarmJson) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null && nm.getNotificationChannel(CHANNEL_ID) == null) {
@@ -143,7 +145,7 @@ public class AdhanService extends Service {
         PendingIntent openPi = PendingIntent.getActivity(this, 0, open, flags);
         Intent stop = new Intent(this, AdhanService.class).setAction(ACTION_STOP);
         PendingIntent stopPi = PendingIntent.getService(this, 1001, stop, flags);
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_iqama)
             .setColor(0xFFD4A84B)
             .setContentTitle(title != null ? title : "الأذان")
@@ -155,8 +157,11 @@ public class AdhanService extends Service {
             .setOngoing(true)
             .setContentIntent(openPi)
             .setDeleteIntent(stopPi)
-            .addAction(0, "إيقاف الأذان", stopPi)
-            .build();
+            .addAction(0, "إيقاف الأذان", stopPi);
+        try {
+            if (alarmJson != null) AlarmReceiver.addSnoozeAction(this, b, new org.json.JSONObject(alarmJson), NOTIF_ID);
+        } catch (Exception ignored) {}
+        return b.build();
     }
 
     private void releasePlayer() {
