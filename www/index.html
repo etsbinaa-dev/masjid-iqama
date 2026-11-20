@@ -418,7 +418,7 @@
           <option value="20">20 دقيقة</option>
         </select>
       </label>
-      <div class="hint2" id="silentHint">إن كنت داخل أي مسجد (في حدود 100 م) وقت إقامته، يصمت الجوال ثم يرجع كما كان. يحتاج الموقع «طوال الوقت».</div>
+      <div class="hint2" id="silentHint">إن كنت داخل أي مسجد (في حدود 100 م) من قبل إقامته بدقيقة إلى بعدها بـ5 دقائق، يصمت الجوال ثم يرجع كما كان. يحتاج الموقع «طوال الوقت».</div>
       <button class="bgLoc" id="dndBtn" hidden>🔕 للصامت الكامل اسمح بـ«عدم الإزعاج» (دونه يكتفي بالاهتزاز)</button>
     </div>
     <div id="fajrSoundBox" hidden>
@@ -1832,8 +1832,10 @@ function buildAutoPlan(alarms) {
   return { variants, checks };
 }
 
-// الصامت في المسجد: لكل وقت إقامة (قبلها بدقيقة) فحص موقع يحمل مواقع المساجد التي تقام فيها الصلاة في ذلك الوقت؛
-// إن كان الجوال داخل أحدها يصمت silentMin دقيقة. نأخذ أقرب 80 مسجداً لآخر موقع (تتجدد كلما فُتح التطبيق).
+// الصامت في المسجد: لكل وقت إقامة ثلاثة فحوص للموقع (قبلها بدقيقة، وبعدها بدقيقتين و5 دقائق لمن يدخل متأخراً)،
+// يحمل كلٌّ منها مواقع المساجد التي تقام فيها الصلاة في ذلك الوقت؛ إن كان الجوال داخل أحدها يصمت silentMin دقيقة
+// (والفحص التالي لا يغيّر شيئاً لأن الجوال صامت أصلاً). نأخذ أقرب 80 مسجداً لآخر موقع (تتجدد كلما فُتح التطبيق).
+const SILENT_OFFSETS = [-1, 2, 5];
 function buildSilentPlan() {
   if (!settings.silentOn || !silentSupported) return [];
   const pool = allMosques().filter(hasPos);
@@ -1841,10 +1843,12 @@ function buildSilentPlan() {
   const groups = new Map();
   const add = (wd, hhmmStr, m) => {
     const [h, mi] = hhmmStr.split(":").map(Number);
-    const t = ((h * 60 + mi - 1) % 1440 + 1440) % 1440;
-    const k = wd + "|" + t;
-    if (!groups.has(k)) groups.set(k, { wd, t, mosques: [] });
-    groups.get(k).mosques.push([+m.lat.toFixed(5), +m.lng.toFixed(5)]);
+    for (const off of SILENT_OFFSETS) {
+      const t = ((h * 60 + mi + off) % 1440 + 1440) % 1440;
+      const k = wd + "|" + t;
+      if (!groups.has(k)) groups.set(k, { wd, t, mosques: [] });
+      groups.get(k).mosques.push([+m.lat.toFixed(5), +m.lng.toFixed(5)]);
+    }
   };
   const now = new Date();
   for (const m of pool.slice(0, 80)) {
