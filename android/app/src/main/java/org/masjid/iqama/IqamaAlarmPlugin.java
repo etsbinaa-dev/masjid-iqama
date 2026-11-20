@@ -131,7 +131,29 @@ public class IqamaAlarmPlugin extends Plugin {
     public void features(PluginCall call) {
         JSObject r = new JSObject();
         r.put("snooze", true);
+        r.put("silent", true);
         call.resolve(r);
+    }
+
+    /** هل أُعطي التطبيق إذن «عدم الإزعاج» (ليضع الجوال على الصامت في المسجد)؟ */
+    @PluginMethod
+    public void dndStatus(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("granted", SilentMode.policyGranted(getContext()));
+        call.resolve(r);
+    }
+
+    /** يفتح صفحة إذن «عدم الإزعاج» في إعدادات الجوال. */
+    @PluginMethod
+    public void requestDnd(PluginCall call) {
+        try {
+            Intent i = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.getMessage());
+        }
     }
 
     @PluginMethod

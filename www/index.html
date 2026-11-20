@@ -310,6 +310,8 @@
   .tChips span { white-space:nowrap; }
   .prRows label:last-child:nth-child(odd) { grid-column:1 / -1; }
   .prRows[hidden] { display:none; }
+  #silentBox { display:flex; flex-direction:column; gap:10px; }
+  #silentBox[hidden], #silentMinRow[hidden] { display:none; }
   .moreBtn { border:none; background:none; color:var(--accent); font-size:.85rem; padding:2px 4px 6px; align-self:flex-start; justify-self:start; }
   .mrow.sel { outline:1.5px solid var(--accent); }
   /* الإعدادات في مجموعات */
@@ -405,6 +407,20 @@
         <option value="0">بلا زر</option>
       </select>
     </label>
+    <div id="silentBox" hidden>
+      <label for="silentOn">صامت الجوال في المسجد وقت الإقامة
+        <input type="checkbox" id="silentOn">
+      </label>
+      <label for="silentMin" id="silentMinRow">مدة الصامت
+        <select id="silentMin">
+          <option value="10">10 دقائق</option>
+          <option value="15">15 دقيقة</option>
+          <option value="20">20 دقيقة</option>
+        </select>
+      </label>
+      <div class="hint2" id="silentHint">إن كنت داخل أي مسجد (في حدود 100 م) وقت إقامته، يصمت الجوال ثم يرجع كما كان. يحتاج الموقع «طوال الوقت».</div>
+      <button class="bgLoc" id="dndBtn" hidden>🔕 للصامت الكامل اسمح بـ«عدم الإزعاج» (دونه يكتفي بالاهتزاز)</button>
+    </div>
     <div id="fajrSoundBox" hidden>
       <label for="fajrSoundSel">صوت الفجر
         <select id="fajrSoundSel">
@@ -585,6 +601,8 @@ if (settings.hijriAdj === undefined) settings.hijriAdj = 0;
 if (!settings.sound) settings.sound = "hayya";
 if (!settings.fajrSound) settings.fajrSound = "same";
 if (settings.snoozeMin === undefined) settings.snoozeMin = 5;
+if (settings.silentOn === undefined) settings.silentOn = false;
+if (!settings.silentMin) settings.silentMin = 10;
 if (settings.fridayRemind === undefined) settings.fridayRemind = true;
 if (!settings.fontPx) settings.fontPx = 16;
 if (!settings.travel) settings.travel = "auto";
@@ -1814,6 +1832,33 @@ function buildAutoPlan(alarms) {
   return { variants, checks };
 }
 
+// الصامت في المسجد: لكل وقت إقامة (قبلها بدقيقة) فحص موقع يحمل مواقع المساجد التي تقام فيها الصلاة في ذلك الوقت؛
+// إن كان الجوال داخل أحدها يصمت silentMin دقيقة. نأخذ أقرب 80 مسجداً لآخر موقع (تتجدد كلما فُتح التطبيق).
+function buildSilentPlan() {
+  if (!settings.silentOn || !silentSupported) return [];
+  const pool = allMosques().filter(hasPos);
+  if (here) pool.sort((a, b) => distKm(here, a) - distKm(here, b));
+  const groups = new Map();
+  const add = (wd, hhmmStr, m) => {
+    const [h, mi] = hhmmStr.split(":").map(Number);
+    const t = ((h * 60 + mi - 1) % 1440 + 1440) % 1440;
+    const k = wd + "|" + t;
+    if (!groups.has(k)) groups.set(k, { wd, t, mosques: [] });
+    groups.get(k).mosques.push([+m.lat.toFixed(5), +m.lng.toFixed(5)]);
+  };
+  const now = new Date();
+  for (const m of pool.slice(0, 80)) {
+    const P = m.prayers;
+    add(0, P[0].iqama, m); add(0, P[2].iqama, m); add(0, P[4].iqama, m);
+    [1, 2, 3, 4, 5, 7].forEach(d => add(d, P[1].iqama, m));   // الظهر عدا الجمعة
+    if (validTime(m.jumuah)) add(6, m.jumuah, m);
+    for (let k = 0; k < 7; k++) { const day = new Date(now); day.setDate(now.getDate() + k); add(day.getDay() + 1, maghribOn(m, day), m); }
+  }
+  return [...groups.values()].slice(0, 300).map((g, i) => ({ id: 3000 + i, silent: true, mins: settings.silentMin,
+    hour: Math.floor(g.t / 60), minute: g.t % 60, weekday: g.wd, mosques: g.mosques }));
+}
+let silentSupported = false;
+
 // نظام التنبيه الخاص بالتطبيق (كود أندرويد): يشغّل "حي على الصلاة" على صوت المنبّه فيُسمع في الوضع الصامت.
 const Alarm = Notif ? window.Capacitor.registerPlugin("IqamaAlarm") : null;
 
@@ -1885,7 +1930,8 @@ async function scheduleAll() {
   try {
     await cleanupOld();
     if (!settings.on) {
-      await Alarm.cancelAll();
+      const sp = buildSilentPlan();
+      if (sp.length) await Alarm.schedule({ alarms: sp, variants: [] }); else await Alarm.cancelAll();
       $("notifyStatus").textContent = "التنبيه متوقف.";
       $("settingsSummary").textContent = "الإعدادات (التنبيه متوقف)";
       try { await scheduleAdhkarReminders(); } catch {}
@@ -1895,7 +1941,7 @@ async function scheduleAll() {
     const granted = await askPermission();
     await ensureFajrAdhan();
     const alarms = buildAlarms(), plan = buildAutoPlan(alarms);
-    await Alarm.schedule({ alarms: alarms.concat(plan.checks), variants: plan.variants });
+    await Alarm.schedule({ alarms: alarms.concat(plan.checks, buildSilentPlan()), variants: plan.variants });
     refreshBgLoc();
     try { await scheduleAdhkarReminders(); } catch {}
     if (granted) {
@@ -1967,7 +2013,24 @@ fajrAdhanAvailable().then(ok => { $("fajrSoundBox").hidden = !ok; });
 // زر «ذكّرني» يحتاج النظام الداخلي 6 أو أحدث (فيه features)
 $("snoozeSel").value = String(settings.snoozeMin);
 $("snoozeSel").onchange = e => { settings.snoozeMin = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
-if (Alarm) Alarm.features().then(f => { $("snoozeRow").hidden = !(f && f.snooze); }).catch(() => {});
+if (Alarm) Alarm.features().then(f => {
+  $("snoozeRow").hidden = !(f && f.snooze);
+  silentSupported = !!(f && f.silent);
+  $("silentBox").hidden = !silentSupported;
+  if (silentSupported) { refreshSilentUi(); if (settings.silentOn) scheduleAll(); }
+}).catch(() => {});
+$("silentOn").checked = settings.silentOn;
+$("silentMin").value = String(settings.silentMin);
+async function refreshSilentUi() {
+  $("silentMinRow").hidden = !settings.silentOn;
+  let dnd = true;
+  if (settings.silentOn) { try { dnd = (await Alarm.dndStatus()).granted; } catch {} }
+  $("dndBtn").hidden = !settings.silentOn || dnd;
+  refreshBgLoc();
+}
+$("silentOn").onchange = e => { settings.silentOn = e.target.checked; store.set("settings", settings); refreshSilentUi(); scheduleAll(); };
+$("silentMin").onchange = e => { settings.silentMin = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
+$("dndBtn").onclick = async () => { try { await Alarm.requestDnd(); } catch {} };
 $("soundSel").value = settings.sound;
 $("soundSel").onchange = e => { settings.sound = e.target.value; store.set("settings", settings); scheduleAll(); };
 $("fridayRemind").checked = settings.fridayRemind;
@@ -1994,7 +2057,7 @@ if (Notif) { try { Notif.addListener("localNotificationActionPerformed", ev => {
 // زر إذن الموقع "طوال الوقت": يظهر فقط في وضع "الأقرب تلقائياً" إن لم يُسمح بعد
 async function refreshBgLoc() {
   let show = false;
-  if (Alarm && (currentWhy !== "fixed" || hasPins())) {
+  if (Alarm && (currentWhy !== "fixed" || hasPins() || settings.silentOn)) {
     try { show = !(await Alarm.bgLocationStatus()).granted; } catch {}
   }
   $("bgLocBtn").hidden = !show || currentWhy === "fixed";
@@ -2437,6 +2500,7 @@ let lastUpdateCheck = Date.now();
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) { stopWatch(); return; }
   refreshMosques(); locate(); startWatch(); refreshBgLoc(); loadPending();
+  if (silentSupported) refreshSilentUi();
   if (Date.now() - lastUpdateCheck > 2 * 60 * 1000) { lastUpdateCheck = Date.now(); checkUpdate(); }
 });
 </script>

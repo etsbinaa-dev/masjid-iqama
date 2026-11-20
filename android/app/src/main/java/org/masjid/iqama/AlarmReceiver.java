@@ -67,6 +67,15 @@ public class AlarmReceiver extends BroadcastReceiver {
         // الموعد القادم بعد دقيقة على الأقل، حتى لو وصل التنبيه قبل وقته بلحظة
         if (a.optBoolean("repeat", true)) IqamaAlarms.scheduleNext(c, a, now + 60_000L);
         // فحص الموقع قبل الصلاة بساعة: لا صوت ولا إشعار، فقط اختيار أقرب مسجد
+        // الصامت في المسجد: فحص الموقع عند وقت الإقامة، أو إرجاع الصوت بعد انتهاء المدة
+        if (a.optBoolean("silentRestore", false)) {
+            SilentMode.restore(c);
+            return;
+        }
+        if (a.optBoolean("silent", false)) {
+            SilentMode.run(c, a, goAsync());
+            return;
+        }
         if (a.optBoolean("check", false)) {
             LocationCheck.run(c, a.optInt("slot"), goAsync());
             return;
