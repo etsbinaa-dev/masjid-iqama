@@ -17,6 +17,10 @@
   :root[data-theme="light"] { --bg:#f6f1e6; --card:#fffdf8; --card2:#efe7d6; --line:rgba(168,120,31,.40); --hair:rgba(31,58,51,.10);
     --text:#1f3a33; --muted:#6f7b75; --accent:#a8781f; --on-accent:#ffffff;
     --head:#1f4a3f; --headText:#f6efdc; --gold1:#d9b25a; --gold2:#b8902f; --onGold:#1b1205; --navbg:#fffdf8; color-scheme:light; }
+  /* المظهر العثماني (الافتراضي): كحلي ليلي مع فيروزي وذهبي، مستوحى من زليج المساجد العثمانية */
+  :root[data-theme="ottoman"] { --bg:#0a1626; --card:#10233a; --card2:#14304d; --line:rgba(217,178,90,.38); --hair:rgba(43,179,166,.18);
+    --text:#e8eef2; --muted:#8fb3c4; --accent:#d9b25a; --on-accent:#0a1626; --teal:#2bb3a6;
+    --head:#0e2036; --headText:#ffffff; --gold1:#ffe39a; --gold2:#d9b25a; --onGold:#0a1626; --navbg:#0b1828; color-scheme:dark; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
          padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
@@ -329,6 +333,36 @@
   .pinPick { width:100%; text-align:start; background:var(--card); border:1px solid var(--hair); border-radius:12px; padding:10px 12px; color:var(--text); }
   .pinPick small { color:var(--muted); }
   .pinPick.on { border-color:var(--accent); }
+  /* ---- لمسات المظهر العثماني ---- */
+  :root[data-theme="ottoman"] body { background:linear-gradient(180deg,#0e2036 0%,#0a1626 340px) no-repeat, #0a1626; }
+  :root[data-theme="ottoman"] .band { position:relative; background:transparent; padding-top:30px; border-radius:0; }
+  :root[data-theme="ottoman"] .band::before { content:""; position:absolute; top:0; left:-16px; right:-16px; height:14px; opacity:.9;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='16' viewBox='0 0 32 16'%3E%3Cpath d='M0 8 L8 0 L16 8 L8 16 Z' fill='%232bb3a6'/%3E%3Cpath d='M16 8 L24 0 L32 8 L24 16 Z' fill='%23d9b25a'/%3E%3Ccircle cx='8' cy='8' r='2.2' fill='%230a1626'/%3E%3Ccircle cx='24' cy='8' r='2.2' fill='%230a1626'/%3E%3C/svg%3E"); background-size:28px 14px; }
+  :root[data-theme="ottoman"] .band h1 { color:#fff; text-shadow:0 0 24px rgba(43,179,166,.35); }
+  :root[data-theme="ottoman"] .pit { background:var(--card); border:1px solid rgba(43,179,166,.22); box-shadow:none; }
+  :root[data-theme="ottoman"] .pit.past { background:transparent; border-color:rgba(43,179,166,.12); }
+  :root[data-theme="ottoman"] .pit.next { color:#fff; border:1px solid rgba(217,178,90,.6);
+    background:radial-gradient(120% 140% at 100% 0%,#2bb3a6 0%,#147a8a 45%,#0f3e66 100%); box-shadow:0 10px 30px rgba(20,122,138,.35); }
+  :root[data-theme="ottoman"] .pit.next .t { color:#ffe39a; }
+  :root[data-theme="ottoman"] .pit.next .cd { color:#d6f1ef; }
+  :root[data-theme="ottoman"] .pit.next .bar { background:rgba(255,255,255,.18); }
+  :root[data-theme="ottoman"] .pit.next .bar i { background:#ffe39a; }
+  :root[data-theme="ottoman"] .smart, :root[data-theme="ottoman"] .nearBtn { background:var(--card); border:1px solid rgba(217,178,90,.35); }
+  :root[data-theme="ottoman"] #smartIc { flex:none; width:44px; height:44px; border-radius:50%; display:grid; place-items:center; background:linear-gradient(135deg,#ffe39a,#d9b25a); }
+  :root[data-theme="ottoman"] #smartIc .si { color:#0a1626; width:1.4rem; height:1.4rem; }
+  :root[data-theme="ottoman"] .smart b { color:#ffe39a; }
+  :root[data-theme="ottoman"] .bnav { background:var(--navbg); border-top:1px solid rgba(43,179,166,.25); }
+  :root[data-theme="ottoman"] .bnav button.on { color:var(--teal); }
+  :root[data-theme="ottoman"] .bnav button.on .ic { background:rgba(43,179,166,.14); }
+  :root[data-theme="ottoman"] .tiles button { border:1px solid rgba(43,179,166,.18); }
+  :root[data-theme="ottoman"] .tiles button .si { color:var(--gold2); }
+  :root[data-theme="ottoman"] .tiles button span { color:#ffe39a; }
+  :root[data-theme="ottoman"] .pageTitle { color:#fff; }
+  :root[data-theme="ottoman"] .grpTitle { color:var(--teal); }
+  :root[data-theme="ottoman"] .mrow, :root[data-theme="ottoman"] .rowBtn, :root[data-theme="ottoman"] .pinRow { border:1px solid rgba(43,179,166,.15); }
+  :root[data-theme="ottoman"] .mtimes span { background:#0d1d31; }
+  :root[data-theme="ottoman"] .dhikr, :root[data-theme="ottoman"] .kahfCard { border:1px solid rgba(43,179,166,.18); }
+  :root[data-theme="ottoman"] select, :root[data-theme="ottoman"] .form input { background:#0d1d31; color:var(--text); border:1px solid rgba(43,179,166,.3); }
 </style>
 </head>
 <body>
@@ -464,6 +498,7 @@
     </label>
     <label for="themeSel">المظهر
       <select id="themeSel">
+        <option value="ottoman">عثماني (أزرق وذهبي)</option>
         <option value="dark">داكن</option>
         <option value="light">فاتح</option>
         <option value="auto">حسب الجوال</option>
@@ -488,10 +523,10 @@
 </div>
 
 <nav class="bnav" id="bnav">
-  <button data-tab="home" class="on"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></span>الرئيسية</button>
-  <button data-tab="mosques"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>المساجد</button>
-  <button data-tab="adhkar"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6"/></svg></span>الأذكار</button>
-  <button data-tab="settings"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>الإعدادات</button>
+  <button data-tab="home" class="on"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 21h16M6 21v-7a6 6 0 0 1 12 0v7"/><path d="M12 8V5"/><path d="M13.5 3.4a1.6 1.6 0 1 1-1.5-1.1"/><path d="M10 21v-3a2 2 0 0 1 4 0v3"/></svg></span>الرئيسية</button>
+  <button data-tab="mosques"><span class="ic"><svg viewBox="0 0 24 24"><path d="M8 21V10l2-3 2 3v11M5 21h14"/><path d="M14 21v-6a3 3 0 0 1 6 0v6"/><path d="M10 7V4"/><path d="M9 13h2"/></svg></span>المساجد</button>
+  <button data-tab="adhkar"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 6c-2-1.6-5-2-8-1.5V19c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V4.5c-3-.5-6-.1-8 1.5z"/><path d="M12 6v14.5"/></svg></span>الأذكار</button>
+  <button data-tab="settings"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.4 3.4 4.1-.6-.6 4.1 3.4 2.6-3.4 2.4.6 4.1-4.1-.6L12 21.5l-2.4-3.6-4.1.6.6-4.1L2.5 12l3.6-2.6-.6-4.1 4.1.6z"/><circle cx="12" cy="12" r="3"/></svg></span>الإعدادات</button>
 </nav>
 
 <div id="sheet" hidden>
@@ -611,11 +646,13 @@ if (!settings.theme) settings.theme = "dark";
 // حجم الخط والمظهر يُطبَّقان فوراً قبل أول رسم
 // التصميم الجديد بألوان فاتحة (اختيار صاحب التطبيق): نطبّقه مرة واحدة، ويبقى الداكن متاحاً في الإعدادات
 if (!store.get("uiV2", false)) { settings.theme = "light"; store.set("settings", settings); store.set("uiV2", true); }
+// المظهر العثماني (اختيار صاحب التطبيق) يصبح الافتراضي مرة واحدة، ويبقى الفاتح والداكن في الإعدادات
+if (!store.get("uiV3", false)) { settings.theme = "ottoman"; store.set("settings", settings); store.set("uiV3", true); }
 function applyLook() {
   document.documentElement.style.fontSize = settings.fontPx + "px";
   const sysLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   const light = settings.theme === "light" || (settings.theme === "auto" && sysLight);
-  document.documentElement.dataset.theme = light ? "light" : "dark";
+  document.documentElement.dataset.theme = settings.theme === "ottoman" ? "ottoman" : light ? "light" : "dark";
 }
 applyLook();
 try { window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyLook); } catch {}
