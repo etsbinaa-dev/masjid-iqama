@@ -73,7 +73,8 @@ public class AlarmReceiver extends BroadcastReceiver {
             return;
         }
         if (a.optBoolean("silent", false)) {
-            SilentMode.run(c, a, goAsync());
+            PendingResult pr = goAsync();
+            SilentMode.check(c, a, true, r -> pr.finish());
             return;
         }
         if (a.optBoolean("check", false)) {

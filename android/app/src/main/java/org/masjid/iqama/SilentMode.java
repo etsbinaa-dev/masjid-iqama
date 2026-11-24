@@ -1,9 +1,11 @@
 package org.masjid.iqama;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.NotificationManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.media.AudioManager;
@@ -17,14 +19,18 @@ import org.json.JSONObject;
 
 /**
  * الصامت في المسجد: عند وقت إقامة مجموعة من المساجد يأخذ موقع الجوال (والتطبيق مغلق)،
- * فإن كان داخل أحدها (في حدود ~100 م) يضع الجوال على الصامت دقائق معدودة ثم يرجعه كما كان.
- * الصامت الكامل يحتاج إذن «عدم الإزعاج»؛ دونه نكتفي بالاهتزاز.
+ * فإن كان داخل أحدها (في حدود ~100 م مع هامش لخطأ الموقع) يضع الجوال على الصامت دقائق معدودة ثم يرجعه كما كان.
+ * الصامت الكامل يحتاج إذن «عدم الإزعاج»؛ دونه نكتفي بالاهتزاز. ونتيجة كل فحص تُحفظ لتظهر في الإعدادات.
  */
 final class SilentMode {
 
+    interface Done { void with(JSONObject result); }
+
     private static final String PREFS = "iqama_silent";
     private static final float NEAR_M = 100f;
-    private static final long WAIT_MS = 10000;
+    // داخل المبنى قد يكون خطأ الموقع كبيراً؛ نتسامح معه حتى 150 م
+    private static final float MAX_SLACK_M = 150f;
+    private static final long WAIT_MS = 12000;
     private static final long MAX_AGE_MS = 10 * 60 * 1000L;
     static final int RESTORE_ID = 3999;
 
@@ -36,52 +42,102 @@ final class SilentMode {
         return nm != null && nm.isNotificationPolicyAccessGranted();
     }
 
-    /** a = {silent:true, mins, mosques:[[lat,lng],...]} */
+    private static boolean fgLocation(Context c) {
+        return ContextCompat.checkSelfPermission(c, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            || ContextCompat.checkSelfPermission(c, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * a = {mins, mosques:[[lat,lng],...]}. background = الفحص المجدول والتطبيق مغلق (يحتاج الموقع «طوال الوقت»)،
+     * وإلا فهو «اختبر الآن» من داخل التطبيق. done يُستدعى دائماً بالنتيجة.
+     */
     @SuppressLint("MissingPermission")
-    static void run(Context c, JSONObject a, BroadcastReceiver.PendingResult pr) {
-        if (!LocationCheck.allowed(c)) {
-            pr.finish();
+    static void check(Context c, JSONObject a, boolean background, Done done) {
+        if (background ? !LocationCheck.allowed(c) : !fgLocation(c)) {
+            finish(c, done, result("noperm", -1, -1, null, background));
             return;
         }
         LocationManager lm = (LocationManager) c.getSystemService(Context.LOCATION_SERVICE);
         if (lm == null) {
-            pr.finish();
+            finish(c, done, result("noloc", -1, -1, null, background));
             return;
         }
-        final boolean[] done = { false };
+        final boolean[] fired = { false };
         final CancellationSignal cancel = new CancellationSignal();
-        class Finish {
+        class Got {
             void with(Location loc) {
-                synchronized (done) {
-                    if (done[0]) return;
-                    done[0] = true;
+                synchronized (fired) {
+                    if (fired[0]) return;
+                    fired[0] = true;
                 }
+                JSONObject r;
                 try {
                     if (loc == null) loc = lastKnown(lm);
-                    if (loc != null && insideAny(loc, a.optJSONArray("mosques"))) silence(c, a.optInt("mins", 10));
-                } catch (Exception ignored) {
-                } finally {
-                    pr.finish();
+                    if (loc == null) {
+                        r = result("noloc", -1, -1, null, background);
+                    } else {
+                        float acc = loc.hasAccuracy() ? loc.getAccuracy() : 0f;
+                        float d = nearest(loc, a.optJSONArray("mosques"));
+                        if (d < 0 || d > NEAR_M + Math.min(MAX_SLACK_M, acc)) {
+                            r = result("far", d, acc, null, background);
+                        } else {
+                            String mode = silence(c, a.optInt("mins", 10));
+                            r = result(mode == null ? "already" : "silenced", d, acc, mode, background);
+                        }
+                    }
+                } catch (Exception e) {
+                    r = result("error", -1, -1, null, background);
                 }
+                finish(c, done, r);
             }
         }
-        Finish finish = new Finish();
+        Got got = new Got();
         // داخل المبنى قد يضعف GPS، فنبدأ بموقع الشبكة إن وُجد
         String provider = null;
         if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) provider = LocationManager.NETWORK_PROVIDER;
         else if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) provider = LocationManager.GPS_PROVIDER;
         if (provider != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                lm.getCurrentLocation(provider, cancel, ContextCompat.getMainExecutor(c), finish::with);
+                lm.getCurrentLocation(provider, cancel, ContextCompat.getMainExecutor(c), got::with);
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
                     cancel.cancel();
-                    finish.with(null);
+                    got.with(null);
                 }, WAIT_MS);
                 return;
             } catch (Exception ignored) {
             }
         }
-        finish.with(null);
+        got.with(null);
+    }
+
+    private static JSONObject result(String outcome, float dist, float acc, String mode, boolean background) {
+        JSONObject r = new JSONObject();
+        try {
+            r.put("at", System.currentTimeMillis());
+            r.put("outcome", outcome);
+            r.put("dist", Math.round(dist));
+            r.put("acc", Math.round(acc));
+            if (mode != null) r.put("mode", mode);
+            r.put("test", !background);
+        } catch (Exception ignored) {
+        }
+        return r;
+    }
+
+    private static void finish(Context c, Done done, JSONObject r) {
+        c.getSharedPreferences(PREFS, 0).edit().putString("lastLog", r.toString()).apply();
+        try {
+            done.with(r);
+        } catch (Exception ignored) {
+        }
+    }
+
+    static JSONObject lastLog(Context c) {
+        try {
+            return new JSONObject(c.getSharedPreferences(PREFS, 0).getString("lastLog", "{}"));
+        } catch (Exception e) {
+            return new JSONObject();
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -98,35 +154,43 @@ final class SilentMode {
         return best;
     }
 
-    private static boolean insideAny(Location here, JSONArray mosques) {
-        if (mosques == null) return false;
+    /** المسافة (م) إلى أقرب مسجد في القائمة، أو -1 إن كانت فارغة. */
+    private static float nearest(Location here, JSONArray mosques) {
+        if (mosques == null) return -1;
+        float best = -1;
         float[] d = new float[1];
-        // نسمح بجزء من خطأ الموقع (حتى 50 م إضافية) لأن الموقع داخل المسجد أقل دقة
-        float slack = Math.min(50f, here.hasAccuracy() ? here.getAccuracy() / 2f : 0f);
         for (int i = 0; i < mosques.length(); i++) {
             JSONArray m = mosques.optJSONArray(i);
             if (m == null || m.length() < 2) continue;
             Location.distanceBetween(here.getLatitude(), here.getLongitude(), m.optDouble(0), m.optDouble(1), d);
-            if (d[0] <= NEAR_M + slack) return true;
+            if (best < 0 || d[0] < best) best = d[0];
         }
-        return false;
+        return best;
     }
 
-    /** يضع الجوال على الصامت (أو الاهتزاز دون إذن «عدم الإزعاج») ويجدول الرجوع بعد mins دقيقة. */
-    private static void silence(Context c, int mins) {
+    /**
+     * يضع الجوال على الصامت (من الرنين أو الاهتزاز) إن كان إذن «عدم الإزعاج» مفعّلاً، وإلا فعلى الاهتزاز (من الرنين)،
+     * ويجدول الرجوع بعد mins دقيقة. يرجع "silent" أو "vibrate"، أو null إن لم يتغيّر شيء (صامت أصلاً).
+     */
+    private static String silence(Context c, int mins) {
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
-        if (am == null) return;
+        if (am == null) return null;
         int before = am.getRingerMode();
-        if (before != AudioManager.RINGER_MODE_NORMAL) return;   // صامت أو اهتزاز أصلاً: لا نغيّر شيئاً
-        int target = policyGranted(c) ? AudioManager.RINGER_MODE_SILENT : AudioManager.RINGER_MODE_VIBRATE;
+        boolean dnd = policyGranted(c);
+        int target;
+        if (before == AudioManager.RINGER_MODE_SILENT) return null;
+        else if (dnd) target = AudioManager.RINGER_MODE_SILENT;
+        else if (before == AudioManager.RINGER_MODE_NORMAL) target = AudioManager.RINGER_MODE_VIBRATE;
+        else return null;   // على الاهتزاز أصلاً ولا إذن للصامت الكامل
         try {
             am.setRingerMode(target);
         } catch (SecurityException e) {
+            if (before != AudioManager.RINGER_MODE_NORMAL) return null;
             target = AudioManager.RINGER_MODE_VIBRATE;
             try {
                 am.setRingerMode(target);
             } catch (Exception ignored) {
-                return;
+                return null;
             }
         }
         c.getSharedPreferences(PREFS, 0).edit().putInt("before", before).putInt("set", target).apply();
@@ -138,13 +202,14 @@ final class SilentMode {
             IqamaAlarms.setAlarm(c, r, System.currentTimeMillis() + Math.max(1, mins) * 60_000L);
         } catch (Exception ignored) {
         }
+        return target == AudioManager.RINGER_MODE_SILENT ? "silent" : "vibrate";
     }
 
     /** يرجع وضع الصوت كما كان، إلا إذا غيّره صاحب الجوال بنفسه في الأثناء. */
     static void restore(Context c) {
-        android.content.SharedPreferences sp = c.getSharedPreferences(PREFS, 0);
+        SharedPreferences sp = c.getSharedPreferences(PREFS, 0);
         int before = sp.getInt("before", -1), set = sp.getInt("set", -1);
-        sp.edit().clear().apply();
+        sp.edit().remove("before").remove("set").apply();
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
         if (am == null || before < 0 || am.getRingerMode() != set) return;
         try {

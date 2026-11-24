@@ -248,6 +248,32 @@
   .pit.next .bar i { flex:none; }
   .pit.next .bar i { display:block; height:100%; background:rgba(27,18,5,.38); border-radius:9px; }
   .sunrise { text-align:center; color:var(--muted); font-size:.8rem; margin:-2px 0; }
+  .pit .pic { display:inline-block; width:1.05em; height:1.05em; vertical-align:-0.15em; margin-inline-end:8px; color:var(--gold2); }
+  .pit .pic svg { width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .pit.past .pic { opacity:.6; }
+  .pit.next { flex-wrap:nowrap; gap:12px; }
+  .pit.next .nxl { flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .pit.next .nxl .lab { font-size:.85rem; opacity:.85; }
+  .pit.next .nxl .dur { font-size:.95rem; font-weight:700; }
+  .pit.next .pic { color:inherit; }
+  .ring { --rc:rgba(27,18,5,.6); --rt:rgba(255,255,255,.35); position:relative; flex:none; width:118px; height:118px; border-radius:50%;
+          display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; }
+  .ring::before { content:""; position:absolute; inset:0; border-radius:50%;
+          background:conic-gradient(var(--rc) calc(var(--p) * 1%), var(--rt) 0);
+          -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+                  mask:radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px)); }
+  .ring b { font-size:1.75rem; font-weight:700; direction:ltr; font-variant-numeric:tabular-nums; }
+  .ring small { font-size:.75rem; opacity:.85; }
+  :root[data-theme="ottoman"] .ring { --rc:#ffe39a; --rt:rgba(255,255,255,.16); }
+  :root[data-theme="ottoman"] .ring b { color:#ffe39a; }
+  /* يوم الجمعة */
+  .friBanner { text-align:center; font-family:"Amiri",serif; font-weight:700; font-size:1.25rem; color:var(--gold2); margin:2px 0 6px;
+               display:flex; align-items:center; justify-content:center; gap:10px; }
+  .friBanner[hidden] { display:none; }
+  .friBanner i { flex:1; max-width:90px; height:1px; background:linear-gradient(90deg,transparent,var(--gold2),transparent); }
+  .friBanner svg { width:12px; height:12px; fill:currentColor; }
+  :root[data-theme="ottoman"] .friBanner { color:#ffe39a; }
+  .smart.kahf { border:1.5px solid var(--gold2); background:linear-gradient(135deg, color-mix(in srgb, var(--gold2) 18%, var(--card)), var(--card)); }
   .shareBtn[hidden] { display:none; }
   .pit .n .az { display:block; font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif; font-size:.72rem; font-weight:400; opacity:.75; margin-top:2px; }
   .subline { display:flex; justify-content:space-between; align-items:center; font-size:.85rem; color:var(--muted); }
@@ -316,6 +342,10 @@
   .prRows[hidden] { display:none; }
   #silentBox { display:flex; flex-direction:column; gap:10px; }
   #silentBox[hidden], #silentMinRow[hidden] { display:none; }
+  .silentStat { background:var(--card); border-radius:12px; padding:10px 14px; font-size:.85rem; line-height:1.8; color:var(--muted); }
+  .silentStat[hidden] { display:none; }
+  .silentStat b { color:var(--text); font-weight:600; }
+  .silentStat .ok { color:#3fbf7f; } .silentStat .no { color:#e0735a; }
   .moreBtn { border:none; background:none; color:var(--accent); font-size:.85rem; padding:2px 4px 6px; align-self:flex-start; justify-self:start; }
   .mrow.sel { outline:1.5px solid var(--accent); }
   /* الإعدادات في مجموعات */
@@ -378,6 +408,7 @@
   <button class="updateBar" id="updateBar" hidden></button>
   <div class="ptr" id="ptr" hidden></div>
   <button class="updateBar adminBar" id="adminBar" hidden></button>
+  <div class="friBanner" id="friBanner" hidden><i></i><svg viewBox="0 0 10 10"><path d="M5 0l5 5-5 5-5-5z"/></svg>جمعة مباركة<svg viewBox="0 0 10 10"><path d="M5 0l5 5-5 5-5-5z"/></svg><i></i></div>
   <div class="plist" id="list"></div>
   <div class="subline" style="justify-content:center"><span id="jumuahLine"></span></div>
   <button class="approxHint" id="approxHint" hidden>~ توقيت تقريبي غير رسمي — يمكنك تعديله ‹</button>
@@ -454,6 +485,8 @@
       </label>
       <div class="hint2" id="silentHint">إن كنت داخل أي مسجد (في حدود 100 م) من قبل إقامته بدقيقة إلى بعدها بـ5 دقائق، يصمت الجوال ثم يرجع كما كان. يحتاج الموقع «طوال الوقت».</div>
       <button class="bgLoc" id="dndBtn" hidden>🔕 للصامت الكامل اسمح بـ«عدم الإزعاج» (دونه يكتفي بالاهتزاز)</button>
+      <div class="silentStat" id="silentStat" hidden></div>
+      <button class="moreBtn" id="silentTest" hidden>اختبر الآن وأنت داخل المسجد ‹</button>
     </div>
     <div id="fajrSoundBox" hidden>
       <label for="fajrSoundSel">صوت الفجر
@@ -694,6 +727,15 @@ function arDuration(totalMin) {
   if (h === 0) return m === 0 ? "الآن" : `بعد ${mins}`;
   return m === 0 ? `بعد ${hrs}` : `بعد ${hrs} و${mins}`;
 }
+// رمز خطي لكل صلاة: فجر، ظهر (شمس)، عصر، مغرب (غروب)، عشاء (هلال)، جمعة (قبة)
+const PRAYER_ICON = {
+  "الفجر": '<svg viewBox="0 0 24 24"><path d="M3 18h18M6 15a6 6 0 0 1 12 0"/><path d="M12 3v4M9.5 5.5L12 3l2.5 2.5"/></svg>',
+  "الظهر": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  "العصر": '<svg viewBox="0 0 24 24"><circle cx="15" cy="9" r="3.5"/><path d="M15 2.5v1.5M20.5 9H22M19 4.9l1-1M3 20h18M5 16h10"/></svg>',
+  "المغرب": '<svg viewBox="0 0 24 24"><path d="M3 18h18M5 21h14M7 18a5 5 0 0 1 10 0"/><path d="M12 4v4M14.5 6.5L12 9 9.5 6.5"/></svg>',
+  "العشاء": '<svg viewBox="0 0 24 24"><path d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z"/><path d="M17 3.5l.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5z"/></svg>',
+  "الجمعة": '<svg viewBox="0 0 24 24"><path d="M4 21h16M6 21v-7a6 6 0 0 1 12 0v7"/><path d="M12 8V5"/><path d="M13.5 3.4a1.6 1.6 0 1 1-1.5-1.1"/></svg>'
+};
 function render() {
   const now = new Date();
   $("name").textContent = cfg.mosqueName;
@@ -720,15 +762,21 @@ function render() {
   const pct = Math.max(2, Math.min(100, Math.round((now - prev) / Math.max(1, nx.time - prev) * 100)));
   // بعد العشاء: الإقامة القادمة هي فجر الغد، فنكبّر الفجر بدل تبهيت كل الصلوات
   const nextIdx = nx.index === -1 ? 0 : nx.index;
+  $("friBanner").hidden = now.getDay() !== 5 || nx.index === -1;
+  const pic = p => `<i class="pic">${PRAYER_ICON[p.name] || ""}</i>`;
   $("list").innerHTML = shown.map((p, i) => {
     const az = p => (p.adhan ? `<small class="az">الأذان ${fmt12(p.adhan)}</small>` : "") +
       (p.from ? `<small class="az">في ${escapeHtml(shortName(p.from.name))}</small>` : "");
     const ap = cfg.travel || p.approx ? "~" : "";   // في السفر، أو وقت غير معروف: الإقامة تقريبية
-    if (i === nextIdx) return `<div class="pit next"><span class="n">${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span>
-      <div class="cd"><span>${ap ? "الإقامة التقريبية القادمة" : "الإقامة القادمة"}${nx.index === -1 ? " (غداً)" : ""}</span><span>${arDuration(mins)}</span></div>
-      <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    if (i === nextIdx) {
+      const [hm, ampm] = fmt12(p.iqama).split(" ");
+      return `<div class="pit next"><div class="nxl"><span class="n">${pic(p)}${p.name}${az(p)}</span>
+        <span class="lab">${ap ? "الإقامة التقريبية القادمة" : "الإقامة القادمة"}${nx.index === -1 ? " (غداً)" : ""}</span>
+        <span class="dur">${arDuration(mins)}</span></div>
+        <div class="ring" style="--p:${pct}"><b>${ap}${hm}</b><small>${ampm === "ص" ? "صباحاً" : "مساءً"}</small></div></div>`;
+    }
     const cls = nx.index !== -1 && i < nx.index ? "past" : "";
-    return `<div class="pit ${cls}"><span class="n">${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span></div>`;
+    return `<div class="pit ${cls}"><span class="n">${pic(p)}${p.name}${az(p)}</span><span class="t">${ap}${fmt12(p.iqama)}</span></div>`;
   }).map((h, i) => i === 0 && cfg.sunrise ? h + `<div class="sunrise">الشروق ${fmt12(cfg.sunrise)}</div>` : h).join("");
   const listDay = nx.index === -1 ? tmr : now;
   $("jumuahLine").textContent = cfg.travel ? "الأذان محسوب لموقعك، والإقامة تقريبية"
@@ -1899,7 +1947,7 @@ function buildSilentPlan() {
   return [...groups.values()].slice(0, 300).map((g, i) => ({ id: 3000 + i, silent: true, mins: settings.silentMin,
     hour: Math.floor(g.t / 60), minute: g.t % 60, weekday: g.wd, mosques: g.mosques }));
 }
-let silentSupported = false;
+let silentSupported = false, silentLogOk = false;
 
 // نظام التنبيه الخاص بالتطبيق (كود أندرويد): يشغّل "حي على الصلاة" على صوت المنبّه فيُسمع في الوضع الصامت.
 const Alarm = Notif ? window.Capacitor.registerPlugin("IqamaAlarm") : null;
@@ -2058,18 +2106,68 @@ $("snoozeSel").onchange = e => { settings.snoozeMin = Number(e.target.value); st
 if (Alarm) Alarm.features().then(f => {
   $("snoozeRow").hidden = !(f && f.snooze);
   silentSupported = !!(f && f.silent);
+  silentLogOk = !!(f && f.silentLog);
   $("silentBox").hidden = !silentSupported;
   if (silentSupported) { refreshSilentUi(); if (settings.silentOn) scheduleAll(); }
 }).catch(() => {});
 $("silentOn").checked = settings.silentOn;
 $("silentMin").value = String(settings.silentMin);
+// نص نتيجة فحص الصامت (من النظام الداخلي)
+function silentOutcome(r) {
+  if (!r || !r.outcome) return "لا يوجد فحص بعد";
+  const when = new Date(r.at).toLocaleString("ar-u-nu-latn", { weekday: "long", hour: "numeric", minute: "2-digit" });
+  const where = r.dist >= 0 ? `أقرب مسجد على بعد ${r.dist} م${r.acc > 0 ? `، ودقة الموقع ± ${r.acc} م` : ""}` : "";
+  const txt = {
+    silenced: `صمت الجوال (${r.mode === "silent" ? "صامت كامل" : "اهتزاز"}) · ${where}`,
+    already: `لم يتغيّر شيء: الجوال صامت أو على الاهتزاز أصلاً · ${where}`,
+    far: `لم يصمت: ${where}`,
+    noloc: "لم يصمت: تعذّر تحديد الموقع (فعّل الموقع/GPS)",
+    noperm: r.test ? "لم يصمت: لا إذن للموقع" : "لم يصمت: لا إذن للموقع «طوال الوقت»",
+    error: "حدث خطأ أثناء الفحص"
+  }[r.outcome] || r.outcome;
+  return `${r.test ? "اختبار" : "فحص"} ${when} — ${txt}`;
+}
+// موعد الفحص القادم من خطة الصامت
+function nextSilentCheck() {
+  const now = new Date(); let best = null;
+  for (const it of buildSilentPlan()) {
+    for (let k = 0; k < 8; k++) {
+      const d = new Date(now); d.setDate(now.getDate() + k); d.setHours(it.hour, it.minute, 0, 0);
+      if (d > now && (!it.weekday || d.getDay() + 1 === it.weekday)) { if (!best || d < best) best = d; break; }
+    }
+  }
+  return best;
+}
 async function refreshSilentUi() {
   $("silentMinRow").hidden = !settings.silentOn;
-  let dnd = true;
-  if (settings.silentOn) { try { dnd = (await Alarm.dndStatus()).granted; } catch {} }
+  $("silentStat").hidden = !settings.silentOn;
+  $("silentTest").hidden = !settings.silentOn || !silentLogOk;
+  let dnd = true, bg = true, log = null;
+  if (settings.silentOn) {
+    try { dnd = (await Alarm.dndStatus()).granted; } catch {}
+    try { bg = (await Alarm.bgLocationStatus()).granted; } catch {}
+    try { log = await Alarm.silentLog(); } catch {}
+    const nx = nextSilentCheck();
+    const mark = ok => ok ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+    $("silentStat").innerHTML = `${mark(dnd)} إذن «عدم الإزعاج» ${dnd ? "" : "(دونه: اهتزاز فقط)"}<br>
+      ${mark(bg)} الموقع «طوال الوقت» ${bg ? "" : "(دونه لا يعمل والتطبيق مغلق)"}<br>
+      <b>الفحص القادم:</b> ${nx ? nx.toLocaleString("ar-u-nu-latn", { weekday: "long", hour: "numeric", minute: "2-digit" }) : "—"}<br>
+      <b>آخر نتيجة:</b> ${escapeHtml(silentOutcome(log))}`;
+  }
   $("dndBtn").hidden = !settings.silentOn || dnd;
   refreshBgLoc();
 }
+$("silentTest").onclick = async () => {
+  $("silentTest").disabled = true; $("silentTest").textContent = "جارٍ تحديد موقعك…";
+  const pool = allMosques().filter(hasPos);
+  if (here) pool.sort((a, b) => distKm(here, a) - distKm(here, b));
+  try {
+    const r = await Alarm.silentTest({ mins: 1, mosques: pool.slice(0, 80).map(m => [+m.lat.toFixed(5), +m.lng.toFixed(5)]) });
+    alert(silentOutcome(r) + (r.outcome === "silenced" ? "\n\nسيرجع الصوت بعد دقيقة." : ""));
+  } catch (e) { alert("تعذّر الاختبار: " + (e.message || e)); }
+  $("silentTest").disabled = false; $("silentTest").textContent = "اختبر الآن وأنت داخل المسجد ‹";
+  refreshSilentUi();
+};
 $("silentOn").onchange = e => { settings.silentOn = e.target.checked; store.set("settings", settings); refreshSilentUi(); scheduleAll(); };
 $("silentMin").onchange = e => { settings.silentMin = Number(e.target.value); store.set("settings", settings); scheduleAll(); };
 $("dndBtn").onclick = async () => { try { await Alarm.requestDnd(); } catch {} };
@@ -2302,6 +2400,7 @@ async function updateSmart() {
   $("smartCard").hidden = !sec;
   if (!sec) return;
   $("smartCard").dataset.sec = sec;
+  $("smartCard").classList.toggle("kahf", sec === "kahf");
   $("smartIc").innerHTML = $("pgAdhkar").querySelector(sec === "kahf" ? "#kahfOpen .si" : `[data-sec="${sec}"] .si`).outerHTML;
   $("smartTitle").textContent = SMART[sec][0];
   const kp = Math.round((store.get("kahfPos", 0) || 0) * 100);

@@ -132,7 +132,37 @@ public class IqamaAlarmPlugin extends Plugin {
         JSObject r = new JSObject();
         r.put("snooze", true);
         r.put("silent", true);
+        r.put("silentLog", true);
         call.resolve(r);
+    }
+
+    /** نتيجة آخر فحص للصامت في المسجد (مجدول أو اختبار). */
+    @PluginMethod
+    public void silentLog(PluginCall call) {
+        try {
+            call.resolve(JSObject.fromJSONObject(SilentMode.lastLog(getContext())));
+        } catch (Exception e) {
+            call.resolve(new JSObject());
+        }
+    }
+
+    /** «اختبر الآن»: يفحص الموقع فوراً مقابل المساجد المرسلة، ويصمت الجوال دقيقة إن كان داخل أحدها. */
+    @PluginMethod
+    public void silentTest(PluginCall call) {
+        try {
+            JSONObject a = new JSONObject();
+            a.put("mins", call.getInt("mins", 1));
+            a.put("mosques", call.getArray("mosques"));
+            SilentMode.check(getContext(), a, false, r -> {
+                try {
+                    call.resolve(JSObject.fromJSONObject(r));
+                } catch (Exception e) {
+                    call.reject(e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            call.reject(e.getMessage());
+        }
     }
 
     /** هل أُعطي التطبيق إذن «عدم الإزعاج» (ليضع الجوال على الصامت في المسجد)؟ */
