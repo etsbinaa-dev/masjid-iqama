@@ -732,7 +732,9 @@ function render() {
   }).map((h, i) => i === 0 && cfg.sunrise ? h + `<div class="sunrise">الشروق ${fmt12(cfg.sunrise)}</div>` : h).join("");
   const listDay = nx.index === -1 ? tmr : now;
   $("jumuahLine").textContent = cfg.travel ? "الأذان محسوب لموقعك، والإقامة تقريبية"
-    : listDay.getDay() === 5 ? "" : `${nx.index === -1 ? "أوقات الغد · " : ""}الجمعة ${cfg.jumApprox ? "~" : ""}${fmt12(cfg.jumuah)}`;
+    // بعد العشاء نوضّح أن الجدول لأوقات الغد ونسمّي يومه، ووقت صلاة الجمعة معلومة منفصلة (إلا إن كان اليوم المعروض جمعة)
+    : [nx.index === -1 ? `أوقات الغد (${tmr.toLocaleDateString("ar", { weekday: "long" })})` : "",
+       listDay.getDay() === 5 ? "" : `صلاة الجمعة ${cfg.jumApprox ? "~" : ""}${fmt12(cfg.jumuah)}`].filter(Boolean).join(" · ");
   // صلاة لها مسجد معيّن وأنت بعيد عنه: نوضّح أن وقتها من مسجدك المعتاد
   const farP = shown.find(p => p.far);
   if (farP && !cfg.travel) $("jumuahLine").textContent = [$("jumuahLine").textContent,
