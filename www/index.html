@@ -2107,6 +2107,7 @@ if (Alarm) Alarm.features().then(f => {
   $("snoozeRow").hidden = !(f && f.snooze);
   silentSupported = !!(f && f.silent);
   silentLogOk = !!(f && f.silentLog);
+  if (f && f.silentRestore) Alarm.silentRestoreIfDue().catch(() => {});
   $("silentBox").hidden = !silentSupported;
   if (silentSupported) { refreshSilentUi(); if (settings.silentOn) scheduleAll(); }
 }).catch(() => {});
@@ -2641,7 +2642,7 @@ let lastUpdateCheck = Date.now();
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) { stopWatch(); return; }
   refreshMosques(); locate(); startWatch(); refreshBgLoc(); loadPending();
-  if (silentSupported) refreshSilentUi();
+  if (silentSupported) { try { Alarm.silentRestoreIfDue().catch(() => {}); } catch {} refreshSilentUi(); }
   if (Date.now() - lastUpdateCheck > 2 * 60 * 1000) { lastUpdateCheck = Date.now(); checkUpdate(); }
 });
 </script>

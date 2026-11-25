@@ -177,6 +177,8 @@ final class SilentMode {
         if (am == null) return null;
         int before = am.getRingerMode();
         boolean dnd = policyGranted(c);
+        NotificationManager nm = c.getSystemService(NotificationManager.class);
+        int filterBefore = nm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? nm.getCurrentInterruptionFilter() : -1;
         int target;
         if (before == AudioManager.RINGER_MODE_SILENT) return null;
         else if (dnd) target = AudioManager.RINGER_MODE_SILENT;
@@ -193,28 +195,46 @@ final class SilentMode {
                 return null;
             }
         }
-        c.getSharedPreferences(PREFS, 0).edit().putInt("before", before).putInt("set", target).apply();
+        // نحفظ وضع الصوت ووضع «عدم الإزعاج» قبل التغيير (سامسونج يفعّل «عدم الإزعاج» مع الصامت الكامل)، وموعد الإرجاع
+        long until = System.currentTimeMillis() + Math.max(1, mins) * 60_000L;
+        c.getSharedPreferences(PREFS, 0).edit().putInt("before", before).putInt("set", target)
+            .putInt("filter", filterBefore).putLong("until", until).apply();
         try {
             JSONObject r = new JSONObject();
             r.put("id", RESTORE_ID);
             r.put("silentRestore", true);
             r.put("repeat", false);
-            IqamaAlarms.setAlarm(c, r, System.currentTimeMillis() + Math.max(1, mins) * 60_000L);
+            IqamaAlarms.setAlarm(c, r, until);
         } catch (Exception ignored) {
         }
         return target == AudioManager.RINGER_MODE_SILENT ? "silent" : "vibrate";
     }
 
-    /** يرجع وضع الصوت كما كان، إلا إذا غيّره صاحب الجوال بنفسه في الأثناء. */
+    /** يرجع وضع «عدم الإزعاج» ووضع الصوت كما كانا قبل الصامت. */
     static void restore(Context c) {
         SharedPreferences sp = c.getSharedPreferences(PREFS, 0);
-        int before = sp.getInt("before", -1), set = sp.getInt("set", -1);
-        sp.edit().remove("before").remove("set").apply();
+        if (!sp.contains("before")) return;
+        int before = sp.getInt("before", -1), filter = sp.getInt("filter", -1);
+        sp.edit().remove("before").remove("set").remove("filter").remove("until").apply();
+        // أولاً «عدم الإزعاج»: إن فعّله النظام مع الصامت نرجعه كما كان
+        if (filter > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && policyGranted(c)) {
+            NotificationManager nm = c.getSystemService(NotificationManager.class);
+            try {
+                if (nm != null && nm.getCurrentInterruptionFilter() != filter) nm.setInterruptionFilter(filter);
+            } catch (Exception ignored) {
+            }
+        }
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
-        if (am == null || before < 0 || am.getRingerMode() != set) return;
+        if (am == null || before < 0) return;
         try {
-            am.setRingerMode(before);
+            if (am.getRingerMode() != before) am.setRingerMode(before);
         } catch (Exception ignored) {
         }
+    }
+
+    /** شبكة أمان: إن فات موعد الإرجاع لأي سبب (أُعيد تشغيل الجوال، أو لم يصل التنبيه) نرجع الصوت الآن. */
+    static void restoreIfDue(Context c) {
+        long until = c.getSharedPreferences(PREFS, 0).getLong("until", 0);
+        if (until > 0 && System.currentTimeMillis() >= until) restore(c);
     }
 }

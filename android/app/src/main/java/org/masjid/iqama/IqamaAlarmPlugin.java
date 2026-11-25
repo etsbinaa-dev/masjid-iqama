@@ -133,7 +133,15 @@ public class IqamaAlarmPlugin extends Plugin {
         r.put("snooze", true);
         r.put("silent", true);
         r.put("silentLog", true);
+        r.put("silentRestore", true);
         call.resolve(r);
+    }
+
+    /** يرجع الصوت إن فات موعد إرجاعه (يُستدعى عند فتح التطبيق). */
+    @PluginMethod
+    public void silentRestoreIfDue(PluginCall call) {
+        SilentMode.restoreIfDue(getContext());
+        call.resolve();
     }
 
     /** نتيجة آخر فحص للصامت في المسجد (مجدول أو اختبار). */
